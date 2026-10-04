@@ -3,24 +3,38 @@
 > These are real vulnerabilities discovered by GSC in production open-source projects.
 > Each finding includes the CWE, project stars, fix PR, and GSC detector that caught it.
 
+## ✅ Merged PRs — Security Fixes in Production
+
+These PRs have been **reviewed, approved, and merged** by upstream maintainers:
+
+| # | Project | ⭐ | CWE | Merged | PR |
+|---|---------|-----|-----|--------|----|
+| 1 | **stanfrbd/cyberbro** | 212 | CWE-79 (XSS) | 2026-08-10 | [#212](https://github.com/stanfrbd/cyberbro/pull/212) ✅ |
+| 2 | **django-files/django-files** | 12 | CWE-798, CWE-521 (Secrets + Default Creds) | 2026-08-18 | [#428](https://github.com/django-files/django-files/pull/428) ✅ |
+| 3 | **cabotage/cabotage-app** | 37 | CWE-798 (4 Flask secrets) | 2026-10-04 | [#388](https://github.com/cabotage/cabotage-app/pull/388) ✅ |
+
+---
+
+## All Findings
+
 | # | Project | ⭐ | Vulnerability | CWE | Detector | PR |
 |---|---------|-----|---------------|-----|----------|----|
 | 1 | **aio-libs/aiohttp-security** | 147 | Session Fixation in demo login handlers — `remember()` without `forget()` allows attacker to hijack authenticated session | CWE-384 | GS019 (session handling) | [#1005](https://github.com/aio-libs/aiohttp-security/pull/1005) |
 | 2 | **mathiasertl/django-ca** | 158 | SSRF in ACME HTTP-01 validation — `validate_http_01()` makes HTTP request to attacker-controlled domain without checking for internal IPs | CWE-918 | GS025 (CVE/SSRF patterns) | [#202](https://github.com/mathiasertl/django-ca/pull/202) |
 | 3 | **deep-learning-indaba/Baobab** | 60 | Hardcoded API key `sk_Lex...` in `api/app/invoice/generator.py` — visible to 533 contributors | CWE-798 | GS029 (Secrets) | [#1401](https://github.com/deep-learning-indaba/Baobab/pull/1401) |
-| 4 | **stanfrbd/cyberbro** | 212 | XSS via innerHTML in search highlight — user-controlled input interpolated into DOM without sanitization | CWE-79 | GS020 (XSS) | [#212](https://github.com/stanfrbd/cyberbro/pull/212) |
+| 4 | **stanfrbd/cyberbro** | 212 | XSS via innerHTML in search highlight — user-controlled input interpolated into DOM without sanitization | CWE-79 | GS020 (XSS) | [#212](https://github.com/stanfrbd/cyberbro/pull/212) ✅ |
 
 | 5 | **manjurulhoque/doccure** | 80 | Hardcoded Django SECRET_KEY in `doccure/settings.py` — allows session forgery, CSRF bypass, password reset token forgery | CWE-798 | GS001 (Hardcoded Secrets) | [#14](https://github.com/manjurulhoque/doccure/pull/14) |
 
 | 6 | **liquidguru/docker-updater** | 74 | Session Fixation in `/login` — `session.clear()` without ID regeneration allows attacker to hijack authenticated session | CWE-384 | GS019 (Session Handling) | [#21](https://github.com/liquidguru/docker-updater/pull/21) |
 
-| 7 | **cabotage/cabotage-app** | 37 | Hardcoded Flask security secrets (`SECRET_KEY="my_precious"`, `SECURITY_PASSWORD_SALT`, `SECURITY_TOTP_SECRETS`, `REGISTRY_AUTH_SECRET`) — allows session forgery, CSRF bypass, TOTP bypass, registry auth bypass | CWE-798 | GS001 (Hardcoded Secrets), GS011 (JWT), GS019 (Session) | [#388](https://github.com/cabotage/cabotage-app/pull/388) |
+| 7 | **cabotage/cabotage-app** | 37 | Hardcoded Flask security secrets (`SECRET_KEY="my_precious"`, `SECURITY_PASSWORD_SALT`, `SECURITY_TOTP_SECRETS`, `REGISTRY_AUTH_SECRET`) — allows session forgery, CSRF bypass, TOTP bypass, registry auth bypass | CWE-798 | GS001 (Hardcoded Secrets), GS011 (JWT), GS019 (Session) | [#388](https://github.com/cabotage/cabotage-app/pull/388) ✅ |
 
 | 8 | **the-broke-sommeliers/wine-cellar** | 53 | Hardcoded Django `SECRET_KEY` with `django-insecure-` prefix + `DEBUG=True` unconditionally — allows session forgery, CSRF bypass, debug info leak | CWE-798, CWE-489 | GS001 (Hardcoded Secrets), GS025-debug_mode | [#1182](https://github.com/the-broke-sommeliers/wine-cellar/pull/1182) |
 
 | 9 | **BrowserlessAPI/VortexPanel** | 22 | OS Command Injection in file manager — `subprocess.run(shell=True)` interpolates unsanitized user input (`q` in `/api/files/search`, `path` in `/api/files/scan`, `src`/`dst`/`output` in extract/compress); `safe_path()` only normalizes paths, doesn't escape shell metacharacters → authenticated RCE | CWE-78 | GS025 (CVE pattern) | [#19](https://github.com/BrowserlessAPI/VortexPanel/pull/19) |
 
-| 10 | **django-files/django-files** | 12 | Hardcoded Django `SECRET_KEY` (`SECRET=JYGTKLzt…`) + default admin creds (`testuser`/`demopassword`) in `docker-compose-prod.yaml` — allows session forgery, CSRF bypass, password-reset token forgery and default admin login | CWE-798, CWE-521 | GS001 (Hardcoded Secrets) | [#428](https://github.com/django-files/django-files/pull/428) |
+| 10 | **django-files/django-files** | 12 | Hardcoded Django `SECRET_KEY` (`SECRET=JYGTKLzt…`) + default admin creds (`testuser`/`demopassword`) in `docker-compose-prod.yaml` — allows session forgery, CSRF bypass, password-reset token forgery and default admin login | CWE-798, CWE-521 | GS001 (Hardcoded Secrets) | [#428](https://github.com/django-files/django-files/pull/428) ✅ |
 
 | 11 | **sankalpjonn/elchapo** | 23 | SSRF via webhook notification — `call_url()` fetches an attacker-controlled webhook URL with no internal-IP validation (blind SSRF to cloud metadata / internal network; reachable unauthenticated because `SECRET_KEY` defaults to the known value `somekey`) | CWE-918 | GS025 (SSRF) | [#7](https://github.com/sankalpjonn/elchapo/pull/7) |
 
