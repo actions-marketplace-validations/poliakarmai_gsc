@@ -1,10 +1,60 @@
 # 🛡️ GSC — Git Security Checker
 
 [![GSC on GitHub Marketplace](https://img.shields.io/badge/Marketplace-GSC%20Security%20Audit-blue)](https://github.com/marketplace/actions/gsc-security-audit)
+[![HOL Guard Scanner](https://img.shields.io/badge/HOL%20Guard-passing-00a67e)](https://github.com/hashgraph-online/hol-guard)
+[![Plugin Security Scan](https://github.com/poliakarmai/gsc/actions/workflows/plugin-scan.yml/badge.svg)](https://github.com/poliakarmai/gsc/actions/workflows/plugin-scan.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**SAST, которое доказывает эксплойт, верифицирует фикс и лечит CI само.**
+## English
 
-GSC — самообучающаяся AppSec-платформа полного цикла:
+**GSC is a self-learning AppSec platform that proves exploits, verifies fixes, and heals CI.**
+
+```
+detect → prove → fix → verify → heal → learn
+```
+
+Most scanners report matches. GSC **proves them**: every finding can be turned into a
+runnable proof-of-concept, validated in a sandbox, then fixed and re-verified by
+re-running the exploit.
+
+**What makes it different:**
+
+- **69 detectors** across SAST, SCA, secrets and IaC — plus a YAML rule DSL.
+- **PoC auto-generation** with a safe-exploitation gate: a finding ships with a working exploit, not just a line number.
+- **Proof-of-Fix** — a patch is only accepted after the exploit stops firing in a sandbox.
+- **Self-learning** — detectors are re-scored nightly against a calibration network; noisy patterns are auto-deactivated at <30% TP. Federated feedback is privacy-first (`{tenant_hash, rule_id, tp, fp}` + DP noise).
+- **Priority by exploitability, not CVSS** — EPSS + CISA KEV + ExploitDB.
+- **BYO-LLM** — the engine, detectors and PoC logic are ours; LLM revalidation runs on *your* key (any OpenAI-compatible endpoint, including a local Ollama). No key → fast regex-only mode.
+
+**Use it as a GitHub Action** (see below) or as an **MCP server** with six read-only tools —
+`scan_repo`, `scan_diff`, `list_findings`, `get_finding`, `verify_finding`, `list_detectors` —
+for Claude Code, Codex, Cursor and other MCP clients. Destructive actions stay out of the
+MCP surface by design.
+
+**Proven on real code:** [HALL_OF_FAME.md](HALL_OF_FAME.md) ·
+first public case study: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md)
+
+**License:** this repo (Action, docs, marketing) is **Apache-2.0**. The engine ships as a
+closed Docker image `ghcr.io/poliakarmai/gsc-scanner` under **BSL 1.1** (free to scan your own
+repos; competing SaaS requires a commercial license; converts to Apache-2.0 on 2030-08-06).
+
+### Case study: XSS in a 122★ OSINT platform
+
+First public proof — [`stanfrbd/cyberbro`](https://github.com/stanfrbd/cyberbro) (46,677 LOC, 281 files):
+
+| | |
+|---|---|
+| Finding | **CWE-79** XSS via search highlight — `static/history.js:148`, `p.innerHTML = p.title.replace(...)` |
+| Severity | HIGH (CVSS 7.5) |
+| Detector | **GS020** (`gs020_xss_injection`) |
+| Fix | 9 lines, 1 file — exploit re-run in sandbox confirms it no longer fires |
+
+Full write-up → [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md) ·
+more findings in production OSS → [HALL_OF_FAME.md](HALL_OF_FAME.md)
+
+---
+
+**GSC — самообучающаяся AppSec-платформа полного цикла.**
 
 ```
 detect → prove → fix → verify → heal → learn
@@ -101,12 +151,6 @@ self-learning: разметка по фиксированной сети + ди�
 **Никто не замыкает петлю обучения в проде — GSC закрывает этот зазор.**
 Подробно, с пруф-базой (доки вендоров + research-статьи) →
 [SELF_LEARNING.md](SELF_LEARNING.md).
-
-## Реальные результаты
-
-Найденные и исправленные уязвимости в production open-source проектах — см. [HALL_OF_FAME.md](HALL_OF_FAME.md).
-
-Первый публичный кейс: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md).
 
 ## 🔌 Интеграции
 

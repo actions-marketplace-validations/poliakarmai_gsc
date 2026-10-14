@@ -81,3 +81,5 @@ docker-compose.yml
 !.github/
 !.github/workflows/
 !.github/workflows/gsc-audit-template.yml
+!.github/workflows/plugin-scan.yml
+!.github/dependabot.yml

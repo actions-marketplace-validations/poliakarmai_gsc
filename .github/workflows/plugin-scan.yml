@@ -1,0 +1,27 @@
+# HOL Guard — plugin security scan
+# Recommended by hashgraph-online/awesome-ai-plugins for listing trust score.
+# https://github.com/hashgraph-online/awesome-ai-plugins/blob/main/SCANNER_GUIDE.md
+name: Plugin Security Scan
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+# Least privilege: the scanner only needs to read the repository.
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2 (pinned)
+        with:
+          persist-credentials: false
+
+      - uses: hashgraph-online/ai-plugin-scanner-action@caba2e96aa8ad2feb6cf6fca52442b52e22e779f  # v1.2.635 (pinned)
+        with:
+          plugin_dir: "."
+          min_score: 80
+          fail_on_severity: high
