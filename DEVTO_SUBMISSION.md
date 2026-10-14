@@ -5,13 +5,13 @@ tags: [bugsmash, security, xss, javascript, webdev]
 
 ## What I Fixed
 
-A **Cross-Site Scripting (XSS)** vulnerability in [cyberbro](https://github.com/stanfrbd/cyberbro) (122 ⭐), an open-source OSINT platform. The search highlight feature used `.innerHTML` with unsanitized user input, allowing reflected XSS in search results.
+A **Cross-Site Scripting (XSS)** vulnerability in [cyberbro](https://github.com/stanfrbd/cyberbro) (122 ⭐ at scan time, 2026-08-08), an open-source OSINT platform. The search highlight feature used `.innerHTML` with unsanitized user input, allowing reflected XSS in search results.
 
 **Found by:** [GSC (Git Security Checker)](https://github.com/poliakarmai/gsc) — self-learning SAST scanner.
 
 ## The Bug
 
-**File:** `src/views/SearchView.js`
+**File:** `static/history.js:50`
 
 The search highlight function took user search terms and injected them directly into the DOM via `.innerHTML`:
 

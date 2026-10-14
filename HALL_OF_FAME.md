@@ -1,13 +1,13 @@
 # 🏆 GSC Hall of Fame — Real Vulnerabilities Found
 
 > These are real vulnerabilities discovered by GSC in production open-source projects.
-> Each finding includes the CWE, project stars, fix PR, and GSC detector that caught it.
+> Each finding includes the CWE, project stars (as of the scan date), fix PR, and GSC detector that caught it.
 
 ## ✅ Merged PRs — Security Fixes in Production
 
 These PRs have been **reviewed, approved, and merged** by upstream maintainers:
 
-| # | Project | ⭐ | CWE | Merged | PR |
+| # | Project | PR # | CWE | Merged | Fix PR |
 |---|---------|-----|-----|--------|----|
 | 1 | **stanfrbd/cyberbro** | 212 | CWE-79 (XSS) | 2026-08-10 | [#212](https://github.com/stanfrbd/cyberbro/pull/212) ✅ |
 | 2 | **django-files/django-files** | 12 | CWE-798, CWE-521 (Secrets + Default Creds) | 2026-08-18 | [#428](https://github.com/django-files/django-files/pull/428) ✅ |

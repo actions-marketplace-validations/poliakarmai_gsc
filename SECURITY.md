@@ -2,9 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported |
-| ------- | --------- |
-| v1.x    | ✅        |
+| Component | Version | Supported |
+| --------- | ------- | --------- |
+| GitHub Action / MCP server | v1.x | ✅ |
+| Engine image (`ghcr.io/poliakarmai/gsc-scanner`) | `1.4.x` | ✅ последние 2 минорные версии |
 
 ## Reporting a Vulnerability
 
@@ -14,7 +15,7 @@ it privately:
 
 - **GitHub Private Vulnerability Reporting** (preferred):
   https://github.com/poliakarmai/gsc/security/advisories/new
-- **Email:** rgtsystems96@gmail.com
+- **Email:** armyanao@gmail.com
 
 **Please do not open a public issue for security problems.**
 

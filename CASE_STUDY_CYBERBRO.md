@@ -7,7 +7,7 @@
 | Параметр | Значение |
 |----------|----------|
 | Репозиторий | stanfrbd/cyberbro |
-| Звёзды | 122 ⭐ |
+| Звёзды | 122 ⭐ (на дату скана, 2026-08-08) |
 | Языки | Python (97), HTML (86), JS (12) |
 | Размер | 46,677 LOC, 281 файл |
 | Тип | OSINT threat intelligence platform |
@@ -18,9 +18,9 @@
 |----------|----------|
 | CWE | CWE-79 — Cross-Site Scripting |
 | Детектор | **GS020** (gs020_xss_injection) |
-| Файл | `static/history.js:148` |
+| Файл | `static/history.js:50` |
 | Суть | `p.innerHTML = p.title.replace(...)` — XSS через поисковый highlight |
-| Severity | HIGH (CVSS 7.5) |
+| Severity | MEDIUM (CVSS 5.4) — reflected XSS, без аутентификации |
 
 ## Фикс
 

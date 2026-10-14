@@ -38,7 +38,7 @@ first public case study: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md)
 closed Docker image `ghcr.io/poliakarmai/gsc-scanner` under **BSL 1.1** (free to scan your own
 repos; competing SaaS requires a commercial license; converts to Apache-2.0 on 2030-08-06).
 
-### Case study: XSS in a 122★ OSINT platform
+### Case study: XSS in a 122★ OSINT platform (stars as of 2026-08-08)
 
 First public proof — [`stanfrbd/cyberbro`](https://github.com/stanfrbd/cyberbro) (46,677 LOC, 281 files):
 
@@ -78,7 +78,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: poliakarmai/gsc@v1
+      - uses: poliakarmai/gsc@v1   # для воспроизводимости — pin на commit SHA
         with:
           fail_on_critical: false   # true = блокировать merge при CRITICAL
 ```
@@ -87,6 +87,11 @@ jobs:
 (CRITICAL / HIGH) и поставит оценку безопасности. Ядро поставляется как
 закрытый Docker-образ `ghcr.io/poliakarmai/gsc-scanner` — исходный код движка
 не публикуется.
+
+> **Воспроизводимость.** `@v1` и тег образа — плавающие ссылки: результат может
+> измениться без изменения вашего workflow. Для аудита/CI фиксируйте
+> `poliakarmai/gsc@<commit-sha>` и образ по digest
+> (`ghcr.io/poliakarmai/gsc-scanner@sha256:<digest>`).
 
 **Входные параметры:** `path`, `deep_scan`, `fail_on_critical`, `fail_on_score`,
 `max_findings_to_comment`, `llm_api_key`, `llm_base_url`, `llm_model`, `sarif`, `reachability`.
@@ -104,13 +109,26 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 | Слой | Возможности |
 |---|---|
 | **SAST** | 69 детекторов (SAST · SCA · Secrets · IaC), YAML rule DSL, LLM-триаж с confidence scoring |
-| **Доказательство** | PoC auto-generation — рабочий эксплойт для каждой находки |
-| **Исправление** | Proof-of-Fix — патч верифицируется перезапуском эксплойта в sandbox; self-healing CI (авто-PR) |
+| **Доказательство** | PoC auto-generation — рабочий эксплойт для находки *(движок; CLI/engine, не MCP)* |
+| **Исправление** | Proof-of-Fix — патч верифицируется перезапуском эксплойта в sandbox; self-healing CI (авто-PR) *(CLI, требует явного флага)* |
 | **Приоритизация** | EPSS + CISA KEV + ExploitDB (не сырой CVSS), БДУ ФСТЭК |
 | **Recon** | passive reconnaissance: subdomain / tech / DNS / HTTP |
 | **Supply chain** | SBOM (CycloneDX / SPDX) + VEX |
 | **Compliance** | маппинг находок на ГОСТ Р 56939-2024, PCI DSS 4.0, SOC2, ISO 27001, CWE, OWASP — отчёт для ФСТЭК / КИИ / аудита |
 | **Интеллект** | security archaeology, predictive forecasting, NL-policy, federated self-learning |
+
+> **Где что доступно.** Возможности движка не равны возможностям Action/MCP:
+>
+> | Возможность | Action | MCP | CLI / engine image |
+> |---|---|---|---|
+> | Скан (SAST/SCA/Secrets/IaC) | ✅ | ✅ | ✅ |
+> | PoC auto-generation | — | — | ✅ (`--with-poc`) |
+> | Proof-of-Fix | — | — | ✅ (`pof generate`) |
+> | Self-healing CI (авто-PR) | — | — | ✅ (`--create-pr`, human-approval) |
+>
+> В MCP **нет** деструктивных действий (auto-patch/PR) — осознанно, они остаются
+> в CLI/human-лупе. `verify_finding` перезапускает PoC в sandbox, то есть по
+> побочным эффектам это не «чисто read-only».
 
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
 
