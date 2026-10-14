@@ -1,14 +1,10 @@
 ---
 title: "The Same Bug, Three Times: Hardcoded Secrets Keep Shipping to Production"
 published: false
-tags: [devchallenge, hf26challenge, security, opensource, ai]
+tags: security, opensource, showdev, ai
 ---
 
-*This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 2: Side Hustle](https://dev.to/challenges/hacktoberfest-week2-2026-10-12)*
-
-## What I Built
-
-A security scanner that writes the fix and opens the PR — and, unusually, **publishes its own false positive**.
+A security scanner that publishes its own false positive — and found the same class of bug in three unrelated projects.
 
 It's called GSC. It found a real vulnerability in a 693-star OSINT platform, four hardcoded secrets in a Flask deployment tool, a default-admin-credentials bug in a file host, and an OS command injection in a server panel. Four fixes landed in production repos. One report was wrong — and one ended up as something more interesting than the fix I proposed. I'm going to show you both.
 
