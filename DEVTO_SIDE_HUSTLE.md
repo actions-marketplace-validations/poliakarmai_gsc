@@ -6,7 +6,7 @@ tags: security, opensource, showdev, ai
 
 A security scanner that publishes its own false positive — and found the same class of bug in three unrelated projects.
 
-It's called GSC. It found a real vulnerability in a 693-star OSINT platform, four hardcoded secrets in a Flask deployment tool, a default-admin-credentials bug in a file host, and an OS command injection in a server panel. Four fixes landed in production repos. One report was wrong — and one ended up as something more interesting than the fix I proposed. I'm going to show you both.
+It's called GSC. It found a debugger exposed on a public interface in a 3,552-star project, an XSS in a 693-star OSINT platform, four hardcoded secrets in a Flask deployment tool, a default-admin-credentials bug in a file host, and an OS command injection in a server panel. Six fixes landed in production repos. One report was wrong — and one ended up as something more interesting than the fix I proposed. I'm going to show you both.
 
 **Who pays for this?** Anyone with a repo they can't afford to be wrong about — and, importantly for what follows, anyone who has already tried a noisy scanner and turned it off.
 
@@ -25,6 +25,12 @@ This is not three mistakes. It's **one broken template, copied three times.** Fr
 For cabotage it was four secrets in one file — a 7-file, +168/−1 patch, because rotating a `SECRET_KEY` isn't a one-line change: it invalidates every session, CSRF token, and TOTP secret already issued. That's the part people don't do by hand.
 
 Why it matters concretely: a leaked `SECRET_KEY` means forged sessions, bypassed CSRF, and forged password-reset tokens. A leaked `SECURITY_TOTP_SECRETS` means your 2FA is decorative. And `testuser`/`demopassword` shipped in a *prod* compose file means the front door was open with a sign on it.
+
+## The Biggest Finding: A Debugger on a 3,552-Star Project
+
+`yoheinakajima/instagraph` had the Werkzeug debugger exposed when the app bound to `0.0.0.0`. That's an interactive Python console on a public interface — request `/console` and, on an unprotected deployment, you get code execution. Merged as [#94](https://github.com/yoheinakajima/instagraph/pull/94), +6/−2.
+
+3,552 stars, and the diff is six lines. That ratio is the whole argument for automated scanning: the severity of a finding has nothing to do with how hard it is to fix, so a human reviewer's attention is wasted looking for it and well spent on the fix.
 
 ## The XSS in a 693-Star Project
 
@@ -85,15 +91,18 @@ Every row below is verifiable against the GitHub API. Reproduce it yourself.
 
 | Project | PR | CWE | Diff |
 |---|---|---|---|
+| yoheinakajima/instagraph ⭐3552 | #94 | Werkzeug debugger exposed | +6/−2 |
 | stanfrbd/cyberbro ⭐693 | #212 | CWE-79 | +8/−1 |
-| django-files ⭐12 | #428 | CWE-798, CWE-521 | +6/−1 |
 | cabotage/cabotage-app ⭐38 | #388 | CWE-798 | +168/−1, 7 files |
+| django-files ⭐12 | #428 | CWE-798, CWE-521 | +6/−1 |
 
 **Accepted — maintainer fixed it themselves:**
 
 | Project | PR | Verified by |
 |---|---|---|
 | BrowserlessAPI/VortexPanel ⭐28 | #19 | v3.5.0 release notes (shell-command validation) |
+| GoyGram/GoyGram ⭐20 | #4 | applied by hand in commit `4cc0778`, Co-authored-by preserved |
+| boaz-ke/duty-calculator | #1 | vulnerability confirmed; maintainer fixed it their own way |
 
 **Partial — PR declined, review surfaced a different real issue:**
 
@@ -105,7 +114,7 @@ Every row below is verifiable against the GitHub API. Reproduce it yourself.
 
 **Rejected:** 1 — and it's in the table above, not hidden.
 
-Four fixes in production — 3 merged, 1 upstream — across 771 combined stars; one partial (a real finding, different from the one I claimed). One report wrong, labelled wrong.
+Six fixes in production — 4 merged patches, 2 fixed upstream by the maintainers — across 4,343 combined stars; one partial (a real finding, different from the one I claimed). One report wrong, labelled wrong.
 
 ## How I Built It
 

@@ -11,9 +11,14 @@ Reviewed, approved, and merged by upstream maintainers — the fix in *our* patc
 
 | # | Project | PR | CWE | Merged | Diff |
 |---|---------|-----|-----|--------|------|
-| 1 | **stanfrbd/cyberbro** ⭐693 | [#212](https://github.com/stanfrbd/cyberbro/pull/212) | CWE-79 (XSS) | 2026-08-10 | +8/−1, 1 file |
-| 2 | **django-files/django-files** ⭐12 | [#428](https://github.com/django-files/django-files/pull/428) | CWE-798, CWE-521 | 2026-08-18 | +6/−1, 2 files |
+| 1 | **yoheinakajima/instagraph** ⭐**3552** | [#94](https://github.com/yoheinakajima/instagraph/pull/94) | Werkzeug debugger exposed on `0.0.0.0` | 2026-10-04 | +6/−2, 2 files |
+| 2 | **stanfrbd/cyberbro** ⭐693 | [#212](https://github.com/stanfrbd/cyberbro/pull/212) | CWE-79 (XSS) | 2026-08-10 | +8/−1, 1 file |
 | 3 | **cabotage/cabotage-app** ⭐38 | [#388](https://github.com/cabotage/cabotage-app/pull/388) | CWE-798 (×4 secrets) | 2026-10-04 | +168/−1, 7 files |
+| 4 | **django-files/django-files** ⭐12 | [#428](https://github.com/django-files/django-files/pull/428) | CWE-798, CWE-521 | 2026-08-18 | +6/−1, 2 files |
+
+> The instagraph row was missing from this file until 2026-10-14 — the largest
+> project in the whole list, absent because the table here was hand-maintained
+> while the authoritative registry lives in the vault. Both are now corrected.
 
 ## 🟢 2. Finding accepted — fix landed in the upstream project
 
@@ -22,13 +27,18 @@ themselves. Verified against the project's own commits/releases:
 
 | # | Project | PR | CWE | Outcome | Verified by |
 |---|---------|-----|-----|---------|-------------|
-| 4 | **BrowserlessAPI/VortexPanel** ⭐28 | [#19](https://github.com/BrowserlessAPI/VortexPanel/pull/19) | CWE-78 (OS command injection) | PR closed by owner 2026-08-17: *"all the Vulnerability closed now"*. Fix shipped as hardening. | **v3.5.0** (2026-08-24) release notes: *"Domain names are validated before reaching shell commands or filesystem paths."* |
-| 5 | **liquidguru/docker-updater** ⭐80 | [#21](https://github.com/liquidguru/docker-updater/pull/21) | — (our CWE-384 claim was **wrong**) | PR declined — correctly: Flask client-side sessions have no persistent session ID to fix. **But the review found a real issue.** | Maintainer: *"reviewing this did turn up something real, so thank you — it wasn't wasted."* Finding: changing `AUTH_PASSWORD` does not invalidate existing sessions (sessions are signed with `FLASK_SECRET_KEY`). Documented in [`e855972`](https://github.com/liquidguru/docker-updater/commit/e855972) — a docs commit, not a code fix. |
+| 5 | **BrowserlessAPI/VortexPanel** ⭐28 | [#19](https://github.com/BrowserlessAPI/VortexPanel/pull/19) | CWE-78 (OS command injection) | PR closed by owner 2026-08-17: *"all the Vulnerability closed now"*. Fix shipped as hardening. | **v3.5.0** (2026-08-24) release notes: *"Domain names are validated before reaching shell commands or filesystem paths."* |
+| 6 | **GoyGram/GoyGram** ⭐20 | [#4](https://github.com/GoyGram/GoyGram/pull/4) | CI hardening (SHA pins, least privilege) | PR closed, but applied by hand — commit [`4cc0778`](https://github.com/GoyGram/GoyGram/commit/4cc0778275624e6677e938a2794c73c78649a3bc), **Co-authored-by preserved**. | Commit exists, touches both workflow files. |
+| 7 | **boaz-ke/duty-calculator** | [#1](https://github.com/boaz-ke/duty-calculator/pull/1) | CWE-601 (open redirect) | Vulnerability **confirmed**; maintainer fixed it on `main` (`f752281`) with a stricter check than ours. | Our own `netloc` check left bypasses — their implementation replaced it. |
 
-> ⚠️ Row 5 is a **partial** result and is labelled as such: our diagnosed
-> vulnerability did not exist. What the review produced was a *different*, real
-> finding that the maintainer documented. Counting it as "merged" would
-> overstate the case.
+## 🔶 2b. Partial — finding rejected, but the review produced a real issue
+
+| # | Project | PR | Outcome |
+|---|---------|-----|---------|
+| 8 | **liquidguru/docker-updater** ⭐80 | [#21](https://github.com/liquidguru/docker-updater/pull/21) | Our CWE-384 claim was **wrong** — Flask's client-side sessions have no persistent session ID, and the maintainer *tested the attack* rather than reasoning about it. What the review surfaced was different and real: changing `AUTH_PASSWORD` does not invalidate existing sessions (they are signed with `FLASK_SECRET_KEY`), so a leaked session outlives the password change by up to 7 days. Documented in [`e855972`](https://github.com/liquidguru/docker-updater/commit/e855972) — a **docs** commit, not a code fix. |
+
+> Row 8 is labelled partial deliberately: our diagnosed vulnerability did not
+> exist. Counting it as "merged" would overstate the case.
 
 ## 🟡 3. Open — submitted, awaiting maintainer
 
@@ -53,14 +63,14 @@ themselves. Verified against the project's own commits/releases:
 
 | Outcome | Count |
 |---|---|
-| ✅ Merged (our patch) | **3** |
-| 🟢 Accepted, fixed upstream by maintainer | **1** |
-| 🔶 Accepted in part (review produced a real, different finding) | **1** |
+| ✅ Merged (our patch) | **4** |
+| 🟢 Accepted, fixed upstream by maintainer | **3** |
+| 🔶 Partial (finding rejected, review produced a real, different one) | **1** |
 | 🟡 Open | **6** |
 | ❌ Rejected (our finding was wrong) | **1** |
 
-**Verified fixes in production: 4** (3 merged patches + 1 fixed upstream by the
-maintainer), across projects with **771 ⭐ combined**. A further report produced
+**Verified fixes in production: 7** (4 merged patches + 3 fixed upstream by the
+maintainers), across projects with **4,343 ⭐ combined**. A further report produced
 a real — but *different* — finding that the maintainer documented. One report
 was simply wrong and is labelled wrong: a scanner's precision claim is only
 meaningful if its misses are counted too.
