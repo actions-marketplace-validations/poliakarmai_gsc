@@ -78,7 +78,7 @@ meaningful if its misses are counted too.
 ## How It Works
 
 GSC scans open-source projects daily using its precision-hunt profile:
-- **7 high-noise detectors disabled** (GS000, GS001, GS003, GS008, GS015, GS023, GS029)
+- **1 detector disabled** (GS000 — the legacy pattern catch-all) and **6 demoted to review-only** (GS007, GS012, GS013, GS015, GS018, GS019): they still flag, but never block
 - **High-precision rules only:** GS005 (SQLi with taint tracking), GS020 (XSS with sanitizer context), GS025 (CVE patterns), YAML-based detectors (SSTI, reverse shell)
 - **Manual verification** before PR submission — every finding is reviewed by a human, which is how the wine-cellar false positive was caught before it cost a maintainer time
 - **Fix-ready PRs** with minimal, targeted code changes
