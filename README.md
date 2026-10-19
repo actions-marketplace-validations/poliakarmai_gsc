@@ -34,6 +34,29 @@ MCP surface by design.
 **Proven on real code:** [HALL_OF_FAME.md](HALL_OF_FAME.md) ·
 first public case study: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md)
 
+### Measured on 100 real GitHub projects
+
+The same fixed corpus is re-scanned after detector changes — 100 real repositories
+(90 clean + 10 known-vulnerable), pinned to specific commits, **regex-only, no LLM key**.
+Same projects every run, so a delta is the fix and not a new dataset.
+
+| | 2026-08-21 (baseline) | 2026-08-28 (after FP fixes) |
+|---|---|---|
+| Findings | 64,831 | 41,127 |
+| CRITICAL | 4,302 | 414 |
+| HIGH | 37,246 | 2,187 |
+| Known-vulnerable projects flagged | 8 / 10 | **10 / 10** |
+| Clean projects with ≥1 false CRITICAL | 48 / 90 | 41 / 90 |
+
+CRITICAL precision on a labeled review of 434 findings: **~4–5% at baseline → 31.1%**
+(TP = 135, FP = 299, 2026-08-26). That is still noisy. The remaining false-positive mass is
+concentrated in GS001 (secrets), GS005 (SQLi), GS020 (XSS) and GS037 (path traversal) and is
+worked down rule by rule — we publish the numbers we have, not the numbers we would like.
+
+*Method note:* corpus, severity counting and per-rule aggregation are ours; the engine ships as
+a closed image, so reproducing this means running `gsc scan --ci --json` over the same pinned
+projects and aggregating the same way. No clean-room comparison against other vendors is implied.
+
 **License:** this repo (Action, docs, marketing) is **Apache-2.0**. The engine ships as a
 closed Docker image `ghcr.io/poliakarmai/gsc-scanner` under **BSL 1.1** (free to scan your own
 repos; competing SaaS requires a commercial license; converts to Apache-2.0 on 2030-08-06).
