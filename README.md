@@ -130,6 +130,15 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 > в CLI/human-лупе. `verify_finding` перезапускает PoC в sandbox, то есть по
 > побочным эффектам это не «чисто read-only».
 
+### Что уже внутри (код, а не план)
+
+| Механика | Где | Что делает |
+|---|---|---|
+| **Мутационный re-attack PoF** | `gsc_cli/gsc_poc_mutator.py` → `gsc_proofoffix.py` | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
+| **Positive control + taint-recheck** | `gsc_pof_sandbox.py`, `tests/test_taint_recheck.py` | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
+| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате |
+| **Quick-режим без LLM** | `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
+
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
 
 GSC — это **движок + детекторы + PoC**, а не очередная обёртка над LLM.
@@ -169,6 +178,11 @@ self-learning: разметка по фиксированной сети + ди�
 **Никто не замыкает петлю обучения в проде — GSC закрывает этот зазор.**
 Подробно, с пруф-базой (доки вендоров + research-статьи) →
 [SELF_LEARNING.md](SELF_LEARNING.md).
+
+> **Честная рамка.** GSC не заменяет Semgrep/CodeQL: у них шире покрытие языков и
+> зрелее правила. GSC закрывает то, чего они не делают — доказывает находку PoC,
+> верифицирует фикс перезапуском эксплойта, учится на TP/FP. Рабочая схема — вместе:
+> зрелый сканер на массовый охват + GSC на закрытие конкретных находок.
 
 ## 🔌 Интеграции
 

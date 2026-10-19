@@ -71,9 +71,12 @@ runs:
           [ -n "${{ inputs.llm_base_url }}" ] && LLM_ENV="$LLM_ENV -e LLM_BASE_URL=${{ inputs.llm_base_url }}"
           [ -n "${{ inputs.llm_model }}" ] && LLM_ENV="$LLM_ENV -e LLM_MODEL=${{ inputs.llm_model }}"
         fi
+        # :v1, не :latest — иначе результат скана меняется при пересборке образа
+        # без изменения workflow. Максимальная строгость:
+        # ghcr.io/poliakarmai/gsc-scanner@sha256:<digest>
         docker run --rm $LLM_ENV \
           -v "$GITHUB_WORKSPACE:/repo:ro" -w /repo \
-          ghcr.io/poliakarmai/gsc-scanner:latest \
+          ghcr.io/poliakarmai/gsc-scanner:v1 \
           $ARGS > "$GITHUB_WORKSPACE/gsc_report.json"
       shell: bash
 
