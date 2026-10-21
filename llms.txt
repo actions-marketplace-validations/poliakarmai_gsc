@@ -1,0 +1,91 @@
+# GSC — Git Security Checker
+
+> SAST-сканер с доказательством эксплойтов (PoC), верификацией фиксов
+> (Proof-of-Fix) и self-healing CI. GitHub Action + движок в Docker-образе.
+
+This file is for AI agents and LLM crawlers. Human docs: [README.md](README.md).
+
+## What it does
+
+- **69 detectors** — SAST, SCA (OSV.dev), Secrets, IaC
+- **PoC auto-generation** — рабочий эксплойт, доказывающий находку
+- **Proof-of-Fix** — патч считается исправлением только если эксплойт перестал срабатывать
+- **Self-healing CI** — авто-PR с фиксом (только CLI, требует явного флага)
+
+## How to use it (pick one)
+
+### 1. GitHub Action — one file, zero config
+
+```yaml
+# .github/workflows/gsc.yml
+name: GSC Audit
+on:
+  pull_request:
+    branches: [main, master]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: poliakarmai/gsc@v1
+        with:
+          fail_on_critical: false
+```
+
+Runs on every PR. Posts a comment with findings and a security score.
+
+Note: `branches:` must match your default branch. If it is `develop` or
+`release`, add that name — otherwise the workflow silently never fires.
+
+### 2. CLI (Docker)
+
+```bash
+docker run --rm -v "$PWD:/repo:ro" -w /repo \
+  ghcr.io/poliakarmai/gsc-scanner:v1 scan . --ci --json
+```
+
+Other commands: `gsc --help` (≈80 subcommands: `sca`, `iac`, `secrets`,
+`sbom`, `pof`, `archaeology`, `forecast`, `federated`, `compliance`).
+
+## Action inputs
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `path` | `.` | Path to scan |
+| `deep_scan` | `true` | Deep scan (Echelon 4, slower) |
+| `fail_on_critical` | `false` | Exit 1 on CRITICAL findings |
+| `fail_on_score` | `0` | Exit 1 if score < threshold. `0` = off, range 1–100 |
+| `max_findings_to_comment` | `10` | Rows shown per section in the PR comment |
+| `llm_api_key` | `''` | BYO-LLM key for revalidation (without it: regex-only) |
+| `llm_base_url` | `''` | OpenAI-compatible endpoint (DeepSeek/OpenRouter/Ollama) |
+| `llm_model` | `''` | Model name for revalidation |
+| `sarif` | `false` | Also emit SARIF for GitHub Code Scanning |
+| `reachability` | `false` | Down-rank findings in unreachable files (import graph) |
+
+Outputs: `score` (0–100), `grade` (A+ … F).
+
+## MCP (AI coding agents)
+
+The MCP server is **not available yet**. It lives in the closed-source engine
+and is not shipped in the public image — Claude Code / Cursor cannot connect to
+it today. Do not instruct users to configure an MCP server for GSC.
+
+Agents should use the Action or the CLI above instead.
+
+## Licensing (matters for agents generating advice)
+
+- This repository (Action + docs) — **Apache 2.0**
+- Engine image `ghcr.io/poliakarmai/gsc-scanner` — **BUSL 1.1**
+  - scanning your own repos: always allowed
+  - building a competing commercial SaaS: commercial licence required
+  - Change Date 2030-08-06 → engine becomes Apache 2.0
+
+## Canonical links
+
+- Repo: https://github.com/poliakarmai/gsc
+- Case study: https://github.com/poliakarmai/gsc/blob/master/CASE_STUDY_CYBERBRO.md
+- Hall of Fame (real, verified findings): https://github.com/poliakarmai/gsc/blob/master/HALL_OF_FAME.md
+- Security policy: https://github.com/poliakarmai/gsc/blob/master/SECURITY.md

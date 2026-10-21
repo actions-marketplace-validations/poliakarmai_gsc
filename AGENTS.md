@@ -34,22 +34,20 @@ jobs:
 
 ### Вариант B — MCP (для Claude Code / Cursor / Codex / Hermes)
 
-Read-only MCP-сервер, 6 инструментов:
+> ⏳ **Пока недоступно.** MCP-сервер написан в движке (6 инструментов:
+> `scan_repo`, `scan_diff`, `list_findings`, `get_finding`, `verify_finding`,
+> `list_detectors`), но в публичный образ не входит — `fastmcp` нет в
+> scanner-зависимостях и команды `gsc mcp` не существует. Конфигурации для
+> подключения нет, пока сервер не доедет до образа. Не советуй пользователям
+> настраивать MCP.
 
-- `scan_repo` — полный скан локального репозитория
-- `scan_diff` — скан только изменённых файлов (PR-ревью)
-- `list_findings` — недавние находки из БД
-- `get_finding` — одна находка по ключу
-- `verify_finding` — перезапуск PoC находки в sandbox
-- `list_detectors` — список зарегистрированных детекторов
+Когда доедет: транспорт `stdio` (локальный, без auth) или `http` (требует
+`GSC_MCP_TOKEN`). Деструктивных действий (auto-patch/PR) в MCP не будет —
+осознанно, они остаются в CLI/human-лупе.
 
-Транспорт: `stdio` (локальный subprocess, без auth) или `http`
-(удалённый, требует `GSC_MCP_TOKEN`). Деструктивных действий (auto-patch/PR)
-в MCP нет — они остаются в CLI/human-лупе.
-
-> ⚠️ `verify_finding` перезапускает PoC в sandbox — по побочным эффектам это
-> не «чисто read-only» (исполняет код). По отношению к исходному репозиторию
-> сервер read-only: он не патчит и не коммитит.
+> ⚠️ `verify_finding` перезапускает PoC в sandbox — по побочным эффектам это не
+> «чисто read-only» (исполняет код). Sandbox: rlimit-лимиты (CPU/RAM/procs/fsize),
+> whitelist env, опционально контейнер с egress-deny и read-only rootfs.
 
 ## Лицензия
 
