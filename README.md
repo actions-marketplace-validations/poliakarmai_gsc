@@ -275,8 +275,11 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 >   `list_findings` и `get_finding` их видят сразу. `get_finding` отвечает из БД
 >   (`source: "database"`), без пересканирования; ~30–60 с — только если ключа
 >   в БД нет и он пересобирает скан.
-> - Нужен writable volume на `/app/.hermes/state` — там SQLite; на read-only FS
->   БД молча не создаётся. `--read-only` не использовать.
+> - Нужен **writable** volume на `/app/.hermes/state` — там SQLite. Docker создаёт
+>   volume от root, а процесс идёт под uid 999, поэтому сначала отдайте права:
+>   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
+>   Без этого `scan_repo` вернёт `persisted: false` (скан работает, БД — нет),
+>   а `--read-only` вообще не годится.
 > - Без `llm_api_key`/`DEEPSEEK_API_KEY` работают только regex-детекторы.
 
 ### Paperclip — «найми GSC как сотрудника по безопасности»

@@ -105,8 +105,10 @@ Safety notes, because an agent is on the other end:
   the database (`persisted: true`). `list_findings` and `get_finding` see them
   immediately; `get_finding` answers from the DB (`source: "database"`).
   Re-scanning (~30–60 s) only happens when the key is not in the DB.
-- Mount a writable volume at `/app/.hermes/state` (SQLite lives there). Do not
-  use `--read-only`: the database fails to initialise silently.
+- Mount a **writable** volume at `/app/.hermes/state` (SQLite lives there). Docker
+  creates it owned by root while the process runs as uid 999, so chown it first:
+  `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
+  Otherwise `scan_repo` returns `persisted: false`. Do not use `--read-only`.
 
 ## Action inputs
 

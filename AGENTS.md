@@ -72,8 +72,10 @@ jobs:
 >   находки в БД (`persisted: true`). `list_findings` и `get_finding` видят их
 >   сразу; `get_finding` отвечает из БД (`source: "database"`). Пересканирование
 >   (~30–60 с) — только когда ключа в БД нет.
-> - Нужен writable volume на `/app/.hermes/state` (там SQLite). `--read-only` не
->   использовать — БД молча не создастся.
+> - Нужен **writable** volume на `/app/.hermes/state` (там SQLite). Docker создаёт
+>   его от root, а процесс идёт под uid 999 — сначала
+>   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
+>   Иначе `persisted: false` (скан есть, БД нет). `--read-only` не подходит.
 > - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
 
 ## Лицензия
