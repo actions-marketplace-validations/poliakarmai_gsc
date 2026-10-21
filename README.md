@@ -125,9 +125,9 @@ jobs:
 | `fail_on_critical` | `false` | `true` — упасть при CRITICAL |
 | `fail_on_score` | `0` | Упасть, если score ниже порога. `0` = выключено, диапазон 1–100 |
 | `max_findings_to_comment` | `10` | Сколько строк показывать в комментарии на каждую секцию |
-| `llm_api_key` | — | BYO-LLM ключ для ревалидации (без него — regex-only) |
-| `llm_base_url` | — | Свой OpenAI-совместимый эндпоинт (DeepSeek/OpenRouter/Ollama) |
-| `llm_model` | — | Имя модели для ревалидации |
+| `llm_api_key` | `''` | BYO-LLM ключ для ревалидации (без него — regex-only) |
+| `llm_base_url` | `''` | Свой OpenAI-совместимый эндпоинт (DeepSeek/OpenRouter/Ollama) |
+| `llm_model` | `''` | Имя модели для ревалидации |
 | `sarif` | `false` | Дополнительно отдать SARIF для GitHub Code Scanning |
 | `reachability` | `false` | Понизить находки в недостижимых файлах (import-graph) |
 
