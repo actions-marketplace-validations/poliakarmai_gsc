@@ -200,3 +200,22 @@ runs:
         echo "::error::GSC found ${{ steps.score.outputs.critical }} CRITICAL findings"
         exit 1
       shell: bash
+
+    - name: Fail on Score
+      if: inputs.fail_on_score != '0'
+      run: |
+        threshold=${{ inputs.fail_on_score }}
+        # A typo'd threshold must not silently pass the gate — fail loudly instead.
+        case "$threshold" in
+          ''|*[!0-9]*) echo "::error::fail_on_score must be an integer 0-100, got '$threshold'"; exit 1 ;;
+        esac
+        if [ "$threshold" -gt 100 ]; then
+          echo "::error::fail_on_score must be 0-100, got $threshold"; exit 1
+        fi
+        score=${{ steps.score.outputs.score }}
+        if [ "$score" -lt "$threshold" ]; then
+          echo "::error::GSC score $score is below the required $threshold (grade ${{ steps.score.outputs.grade }})"
+          exit 1
+        fi
+        echo "GSC score $score meets the required $threshold"
+      shell: bash

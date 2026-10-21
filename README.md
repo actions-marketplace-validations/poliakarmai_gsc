@@ -116,8 +116,28 @@ jobs:
 > `poliakarmai/gsc@<commit-sha>` и образ по digest
 > (`ghcr.io/poliakarmai/gsc-scanner@sha256:<digest>`).
 
-**Входные параметры:** `path`, `deep_scan`, `fail_on_critical`, `fail_on_score`,
-`max_findings_to_comment`, `llm_api_key`, `llm_base_url`, `llm_model`, `sarif`, `reachability`.
+**Входные параметры:**
+
+| Вход | По умолчанию | Что делает |
+| --- | --- | --- |
+| `path` | `.` | Что сканировать (корень репозитория) |
+| `deep_scan` | `true` | Глубокий скан (Echelon 4, медленнее) |
+| `fail_on_critical` | `false` | `true` — упасть при CRITICAL |
+| `fail_on_score` | `0` | Упасть, если score ниже порога. `0` = выключено, диапазон 1–100 |
+| `max_findings_to_comment` | `10` | Сколько строк показывать в комментарии на каждую секцию |
+| `llm_api_key` | — | BYO-LLM ключ для ревалидации (без него — regex-only) |
+| `llm_base_url` | — | Свой OpenAI-совместимый эндпоинт (DeepSeek/OpenRouter/Ollama) |
+| `llm_model` | — | Имя модели для ревалидации |
+| `sarif` | `false` | Дополнительно отдать SARIF для GitHub Code Scanning |
+| `reachability` | `false` | Понизить находки в недостижимых файлах (import-graph) |
+
+**Выходы:** `score` (0–100) и `grade` (A+ … F).
+
+> Комментарий в PR считает находки **по локациям** (`file:line`), а не по
+> срабатываниям детекторов: один секрет, пойманый четырьмя правилами, — это
+> одна строка с перечислением правил, а не четыре. `Total` в таблице всегда
+> равен сумме категорий.
+
 
 LLM-ревалидация — на вашем ключе (BYO-LLM):
 ```yaml
