@@ -180,7 +180,7 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 |---|---|---|
 | **Мутационный re-attack PoF** | `gsc_cli/gsc_poc_mutator.py` → `gsc_proofoffix.py` | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
 | **Positive control + taint-recheck** | `gsc_pof_sandbox.py`, `tests/test_taint_recheck.py` | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
-| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате. **В публичном образе docker/podman нет** → работает rlimit, вердикт `unverified`; полная изоляция — только с проброшенным `docker.sock` |
+| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате. **В публичном образе docker/podman нет** → движок fail-closed: PoC не исполняется вовсе, вердикт `unavailable` (это НЕ «не воспроизводится»); реальный прогон PoC — CLI на хосте с docker/podman. Проброс `docker.sock` — не изоляция, а выдача PoC хостового демона |
 | **Quick-режим без LLM** | `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
 
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
@@ -233,7 +233,7 @@ self-learning: разметка по фиксированной сети + ди�
 ### MCP — подключи GSC к Claude Code / Cursor / Codex
 
 Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию — не патчит
-и не делает PR; `verify_finding` исполняет PoC): `scan_repo`, `scan_diff`,
+и не делает PR; `verify_finding` исполняет PoC там, где есть docker/podman — см. границы ниже): `scan_repo`, `scan_diff`,
 `list_findings`, `get_finding`, `verify_finding`, `list_detectors`.
 Сервер уже внутри образа — `.mcp.json` в корне проекта (Claude Code):
 
@@ -265,11 +265,18 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 > ⚠️ **На том конце — агент, и честно о границах:**
 >
 > - Деструктивных действий нет: ни auto-patch, ни PR — они в CLI/human-лупе.
-> - `verify_finding` **исполняет PoC**. Гейты в коде реальные (DESTRUCTIVE-PoC и
->   недетерминированный PoC отклоняются), но **OS-изоляции в этом образе нет**:
->   внутри нет docker/podman, поэтому PoC выполняется в том же контейнере под
->   rlimit-лимитами, а результат помечается `unverified`, а не `verified`.
->   Нужна настоящая изоляция — пробросьте `docker.sock` и образ `gsc-sandbox`.
+> - `verify_finding` **не исполняет PoC в этом образе**. Гейты в коде реальные
+>   (DESTRUCTIVE-PoC и недетерминированный PoC отклоняются), а без OS-изоляции
+>   движок fail-closed: docker/podman внутри нет → PoC не запускается вовсе,
+>   тул отвечает `status: "unavailable"` + hint. Это **не** «не воспроизводится»:
+>   о самой находке такой ответ не говорит ничего. Реальный прогон — CLI на хосте
+>   с docker/podman. Проброс `docker.sock` — не изоляция, а выдача PoC хостового
+>   демона (эквивалент root): не делать.
+> - `scan_repo` ограничен бюджетом: `GSC_SCAN_TIMEOUT` (default 300 с) на свип
+>   детекторов, `GSC_MAX_FILES` (default 50 000) на инвентарь. Упёрлись в лимит —
+>   в ответе `status: "partial"`, `truncated: true` и список детекторов, которые
+>   не запускались. Мало находок там **не значит** «чисто»; такой скан в БД не
+>   сохраняется.
 > - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
 > - `scan_repo` сохраняет находки в БД (`persisted: true` в ответе), поэтому
 >   `list_findings` и `get_finding` их видят сразу. `get_finding` отвечает из БД

@@ -52,7 +52,7 @@ Other commands: `gsc --help` (≈80 subcommands: `sca`, `iac`, `secrets`,
 
 ### 3. MCP server — connect an AI coding agent
 
-The engine image ships an MCP server with six tools (read-only towards your repo; `verify_finding` executes a PoC):
+The engine image ships an MCP server with six tools (read-only towards your repo; `verify_finding` would run a PoC — see the safety notes below):
 
 | Tool | What it does |
 | --- | --- |
@@ -95,11 +95,19 @@ Safety notes, because an agent is on the other end:
 
 - **No destructive actions.** No auto-patch, no PR, no writes to your repo —
   deliberately kept out of MCP and left in the CLI/human loop.
-- `verify_finding` **executes the PoC**. Code gates are real (DESTRUCTIVE and
-  non-deterministic PoCs are refused), but there is **no OS isolation in this
-  image**: it ships no docker/podman, so the PoC runs inside the same container
-  under rlimits and the verdict is marked `unverified`, not `verified`. For real
-  isolation pass `docker.sock` plus the `gsc-sandbox` image.
+- `verify_finding` **would execute a PoC — but cannot in this image**. Code gates
+  are real (DESTRUCTIVE and non-deterministic PoCs are refused), and the engine is
+  fail-closed without OS isolation: this image ships no docker/podman, so the PoC
+  is **not executed at all** and the tool answers `status: "unavailable"` with a
+  hint. That verdict says nothing about the finding — it is not "not
+  reproducible". To actually run the PoC, use the CLI on a host with
+  docker/podman. Passing `docker.sock` into this container is *not* isolation: it
+  hands the PoC the host daemon (root-equivalent) — don't.
+- `scan_repo` is bounded: a detector sweep is capped by `GSC_SCAN_TIMEOUT`
+  (default 300s) and the file inventory by `GSC_MAX_FILES` (default 50,000). If
+  either cap is hit the answer comes back with `status: "partial"`,
+  `truncated: true` and the list of detectors that never ran — a low finding
+  count there is **not** a clean repo. A truncated scan is not persisted.
 - `GSC_ALLOWED_ROOTS` confines `scan_repo`/`scan_diff` to mounted paths.
 - `scan_repo` is the only tool that actually scans, and it persists findings to
   the database (`persisted: true`). `list_findings` and `get_finding` see them
