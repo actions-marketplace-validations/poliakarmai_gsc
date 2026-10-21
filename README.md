@@ -27,9 +27,10 @@ re-running the exploit.
 - **BYO-LLM** — the engine, detectors and PoC logic are ours; LLM revalidation runs on *your* key (any OpenAI-compatible endpoint, including a local Ollama). No key → fast regex-only mode.
 
 **Use it as a GitHub Action** (see below), from the **CLI / Docker image**, or as an
-**MCP server** for AI coding agents — six read-only tools (`scan_repo`, `scan_diff`,
+**MCP server** for AI coding agents — six tools (`scan_repo`, `scan_diff`,
 `list_findings`, `get_finding`, `verify_finding`, `list_detectors`) over stdio or HTTP.
-Destructive actions stay out of the MCP surface by design.
+Read-only towards your repository: no patching, no PRs, no writes to the working tree.
+(`verify_finding` does execute a PoC — see the safety notes in the MCP section.)
 
 **Proven on real code:** [HALL_OF_FAME.md](HALL_OF_FAME.md) ·
 first public case study: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md)
@@ -179,7 +180,7 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 |---|---|---|
 | **Мутационный re-attack PoF** | `gsc_cli/gsc_poc_mutator.py` → `gsc_proofoffix.py` | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
 | **Positive control + taint-recheck** | `gsc_pof_sandbox.py`, `tests/test_taint_recheck.py` | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
-| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате |
+| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате. **В публичном образе docker/podman нет** → работает rlimit, вердикт `unverified`; полная изоляция — только с проброшенным `docker.sock` |
 | **Quick-режим без LLM** | `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
 
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
@@ -231,7 +232,8 @@ self-learning: разметка по фиксированной сети + ди�
 
 ### MCP — подключи GSC к Claude Code / Cursor / Codex
 
-Движок отдаёт 6 read-only инструментов по MCP: `scan_repo`, `scan_diff`,
+Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию — не патчит
+и не делает PR; `verify_finding` исполняет PoC): `scan_repo`, `scan_diff`,
 `list_findings`, `get_finding`, `verify_finding`, `list_detectors`.
 Сервер уже внутри образа — `.mcp.json` в корне проекта (Claude Code):
 
@@ -242,6 +244,7 @@ self-learning: разметка по фиксированной сети + ди�
       "command": "docker",
       "args": ["run", "--rm", "-i",
                "-v", "${PWD}:/repo:ro",
+               "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
       "env": { "GSC_ALLOWED_ROOTS": "/repo" }
     }
@@ -259,11 +262,22 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
   ghcr.io/poliakarmai/gsc-scanner:v1 mcp --transport http --host 0.0.0.0 --port 8001
 ```
 
-> ⚠️ **На том конце — агент.** Деструктивных действий в MCP нет (ни auto-patch,
-> ни PR — они в CLI/human-лупе). `verify_finding` **исполняет PoC** в sandbox
-> (rlimit на CPU/RAM/procs/fsize, whitelist env, опционально контейнер с
-> egress-deny и read-only rootfs) — это запуск кода, а не чтение.
-> `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
+> ⚠️ **На том конце — агент, и честно о границах:**
+>
+> - Деструктивных действий нет: ни auto-patch, ни PR — они в CLI/human-лупе.
+> - `verify_finding` **исполняет PoC**. Гейты в коде реальные (DESTRUCTIVE-PoC и
+>   недетерминированный PoC отклоняются), но **OS-изоляции в этом образе нет**:
+>   внутри нет docker/podman, поэтому PoC выполняется в том же контейнере под
+>   rlimit-лимитами, а результат помечается `unverified`, а не `verified`.
+>   Нужна настоящая изоляция — пробросьте `docker.sock` и образ `gsc-sandbox`.
+> - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
+> - `scan_repo` — единственный тул, который реально сканирует. `get_finding` и
+>   `verify_finding` **не находят** его результаты: находки не пишутся в БД
+>   (получают ключи только через `gsc scan --with-poc`), а сами эти тулы
+>   пересчитывают скан (~30–60 с). `list_findings` вернёт `[]`, пока БД пуста.
+> - Нужен writable volume на `/app/.hermes/state` — там SQLite; на read-only FS
+>   БД молча не создаётся. `--read-only` не использовать.
+> - Без `llm_api_key`/`DEEPSEEK_API_KEY` работают только regex-детекторы.
 
 ### Paperclip — «найми GSC как сотрудника по безопасности»
 
@@ -271,8 +285,9 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 подключает GSC через MCP Tool Gateway — любой нанятый агент (Claude Code / Codex / Hermes)
 получает GSC-инструменты и роль «Security Engineer».
 
-> 📦 Интеграция идёт через MCP-сервер образа (см. раздел MCP выше); гайд и skill
-> `gsc-security-review` — в `docs/integrations/paperclip/` (репозиторий gsc-core).
+> 📦 Интеграция идёт через MCP-сервер образа (см. раздел MCP выше). Гайд и skill
+> `gsc-security-review` поставляются с коммерческим доступом (репозиторий
+> `gsc-core`, `docs/integrations/paperclip/`) — в публичном репо их нет.
 - **Транспорт:** `local_stdio` (subprocess) или `mcp_remote` (HTTP)
 
 Подключение за минуты: зарегистрируй `ToolStdioCommandTemplate`, создай gateway — и GSC сканирует репозитории твоей Paperclip-компании.

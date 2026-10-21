@@ -52,7 +52,7 @@ Other commands: `gsc --help` (≈80 subcommands: `sca`, `iac`, `secrets`,
 
 ### 3. MCP server — connect an AI coding agent
 
-The engine image ships a read-only MCP server with six tools:
+The engine image ships an MCP server with six tools (read-only towards your repo; `verify_finding` executes a PoC):
 
 | Tool | What it does |
 | --- | --- |
@@ -72,6 +72,7 @@ The engine image ships a read-only MCP server with six tools:
       "command": "docker",
       "args": ["run", "--rm", "-i",
                "-v", "${PWD}:/repo:ro",
+               "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
       "env": { "GSC_ALLOWED_ROOTS": "/repo" }
     }
@@ -94,10 +95,17 @@ Safety notes, because an agent is on the other end:
 
 - **No destructive actions.** No auto-patch, no PR, no writes to your repo —
   deliberately kept out of MCP and left in the CLI/human loop.
-- `verify_finding` **executes the PoC** in a sandbox (rlimit CPU/RAM/procs/fsize,
-  env whitelist, optional container with egress-deny and read-only rootfs).
-  Treat it as code execution, not a read.
+- `verify_finding` **executes the PoC**. Code gates are real (DESTRUCTIVE and
+  non-deterministic PoCs are refused), but there is **no OS isolation in this
+  image**: it ships no docker/podman, so the PoC runs inside the same container
+  under rlimits and the verdict is marked `unverified`, not `verified`. For real
+  isolation pass `docker.sock` plus the `gsc-sandbox` image.
 - `GSC_ALLOWED_ROOTS` confines `scan_repo`/`scan_diff` to mounted paths.
+- `scan_repo` is the only tool that actually scans. Findings are **not saved to
+  the database**, so `list_findings` returns `[]` and `get_finding` /
+  `verify_finding` cannot find scan results (they re-run a scan, ~30–60 s).
+- Mount a writable volume at `/app/.hermes/state` (SQLite lives there). Do not
+  use `--read-only`: the database fails to initialise silently.
 
 ## Action inputs
 
@@ -119,7 +127,7 @@ Outputs: `score` (0–100), `grade` (A+ … F).
 ## MCP (AI coding agents)
 
 Shipped. See section 3 above: `docker run ... gsc-scanner:v1 mcp` speaks MCP over
-stdio; six read-only tools. No code from the closed-source engine is published —
+stdio; six tools. No code from the closed-source engine is published —
 the server runs inside the image.
 
 ## Licensing (matters for agents generating advice)

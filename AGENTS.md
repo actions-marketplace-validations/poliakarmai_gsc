@@ -34,7 +34,7 @@ jobs:
 
 ### Вариант B — MCP (для Claude Code / Cursor / Codex / Hermes)
 
-Движок отдаёт 6 read-only инструментов по MCP: `scan_repo` (скан репо),
+Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию; `verify_finding` исполняет PoC): `scan_repo` (скан репо),
 `scan_diff` (только изменённые файлы), `list_findings` (из БД, без скана),
 `get_finding` (по ключу), `verify_finding` (перезапуск PoC в sandbox),
 `list_detectors` (список детекторов).
@@ -48,6 +48,7 @@ jobs:
       "command": "docker",
       "args": ["run", "--rm", "-i",
                "-v", "${PWD}:/repo:ro",
+               "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
       "env": { "GSC_ALLOWED_ROOTS": "/repo" }
     }
@@ -61,10 +62,18 @@ jobs:
 Деструктивных действий (auto-patch/PR) в MCP нет — осознанно, они остаются
 в CLI/human-лупе.
 
-> ⚠️ `verify_finding` перезапускает PoC в sandbox — по побочным эффектам это не
-> «чисто read-only» (исполняет код). Sandbox: rlimit-лимиты (CPU/RAM/procs/fsize),
-> whitelist env, опционально контейнер с egress-deny и read-only rootfs.
-> `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
+> ⚠️ Честно о границах (проверено в пересобранном образе):
+> - `verify_finding` **исполняет PoC**. Гейты в коде реальные (DESTRUCTIVE и
+>   недетерминированные PoC отклоняются), но **OS-изоляции нет**: в образе нет
+>   docker/podman, поэтому PoC идёт в том же контейнере под rlimit, а статус
+>   помечается `unverified`, а не `verified`. Изоляция — только с проброшенным
+>   `docker.sock` и образом `gsc-sandbox`.
+> - `scan_repo` — единственный тул, который реально сканирует. Находки **не
+>   пишутся в БД**, поэтому `list_findings` вернёт `[]`, а `get_finding` /
+>   `verify_finding` их не найдут (пересчитывают скан, ~30–60 с).
+> - Нужен writable volume на `/app/.hermes/state` (там SQLite). `--read-only` не
+>   использовать — БД молча не создастся.
+> - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
 
 ## Лицензия
 
