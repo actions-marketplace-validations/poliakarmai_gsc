@@ -50,6 +50,55 @@ docker run --rm -v "$PWD:/repo:ro" -w /repo \
 Other commands: `gsc --help` (≈80 subcommands: `sca`, `iac`, `secrets`,
 `sbom`, `pof`, `archaeology`, `forecast`, `federated`, `compliance`).
 
+### 3. MCP server — connect an AI coding agent
+
+The engine image ships a read-only MCP server with six tools:
+
+| Tool | What it does |
+| --- | --- |
+| `scan_repo` | Scan a local repository path, return counts + top findings |
+| `scan_diff` | Scan only files changed vs a git base ref (PR review) |
+| `list_findings` | Read recent findings from the local database (no scan) |
+| `get_finding` | Full detail of one finding by `finding_key` |
+| `verify_finding` | Re-run a finding's PoC in the sandbox, report exploit status |
+| `list_detectors` | List detectors registered with the engine |
+
+**Claude Code** — add to `.mcp.json` (project) or `~/.claude.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "gsc": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i",
+               "-v", "${PWD}:/repo:ro",
+               "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
+      "env": { "GSC_ALLOWED_ROOTS": "/repo" }
+    }
+  }
+}
+```
+
+**Cursor / any other MCP client** — same shape (`command` + `args`).
+Server speaks MCP over stdio by default; everything non-protocol goes to stderr.
+
+**HTTP transport** (remote/shared, requires a token — fail-closed):
+
+```bash
+docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
+  ghcr.io/poliakarmai/gsc-scanner:v1 \
+  mcp --transport http --host 0.0.0.0 --port 8001
+```
+
+Safety notes, because an agent is on the other end:
+
+- **No destructive actions.** No auto-patch, no PR, no writes to your repo —
+  deliberately kept out of MCP and left in the CLI/human loop.
+- `verify_finding` **executes the PoC** in a sandbox (rlimit CPU/RAM/procs/fsize,
+  env whitelist, optional container with egress-deny and read-only rootfs).
+  Treat it as code execution, not a read.
+- `GSC_ALLOWED_ROOTS` confines `scan_repo`/`scan_diff` to mounted paths.
+
 ## Action inputs
 
 | Input | Default | Meaning |
@@ -69,11 +118,9 @@ Outputs: `score` (0–100), `grade` (A+ … F).
 
 ## MCP (AI coding agents)
 
-The MCP server is **not available yet**. It lives in the closed-source engine
-and is not shipped in the public image — Claude Code / Cursor cannot connect to
-it today. Do not instruct users to configure an MCP server for GSC.
-
-Agents should use the Action or the CLI above instead.
+Shipped. See section 3 above: `docker run ... gsc-scanner:v1 mcp` speaks MCP over
+stdio; six read-only tools. No code from the closed-source engine is published —
+the server runs inside the image.
 
 ## Licensing (matters for agents generating advice)
 

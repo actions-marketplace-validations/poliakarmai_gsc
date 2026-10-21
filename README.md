@@ -26,13 +26,10 @@ re-running the exploit.
 - **Priority by exploitability, not CVSS** — EPSS + CISA KEV + ExploitDB.
 - **BYO-LLM** — the engine, detectors and PoC logic are ours; LLM revalidation runs on *your* key (any OpenAI-compatible endpoint, including a local Ollama). No key → fast regex-only mode.
 
-**Use it as a GitHub Action** (see below) or from the **CLI / Docker image**.
-
-> **MCP — in development, not shipped yet.** The read-only MCP server (six tools:
-> `scan_repo`, `scan_diff`, `list_findings`, `get_finding`, `verify_finding`,
-> `list_detectors`) is built into the closed-source engine but is **not available
-> in the public image today**. Until it ships there is no MCP configuration to add —
-> use the Action or the CLI below. Star/watch the repo for the release.
+**Use it as a GitHub Action** (see below), from the **CLI / Docker image**, or as an
+**MCP server** for AI coding agents — six read-only tools (`scan_repo`, `scan_diff`,
+`list_findings`, `get_finding`, `verify_finding`, `list_detectors`) over stdio or HTTP.
+Destructive actions stay out of the MCP surface by design.
 
 **Proven on real code:** [HALL_OF_FAME.md](HALL_OF_FAME.md) ·
 first public case study: [CASE_STUDY_CYBERBRO.md](CASE_STUDY_CYBERBRO.md)
@@ -167,18 +164,14 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 >
 > | Возможность | Action | MCP | CLI / engine image |
 > |---|---|---|---|
-> | Скан (SAST/SCA/Secrets/IaC) | ✅ | ⏳ не поставляется | ✅ |
+> | Скан (SAST/SCA/Secrets/IaC) | ✅ | ✅ | ✅ |
 > | PoC auto-generation | — | — | ✅ (`--with-poc`) |
 > | Proof-of-Fix | — | — | ✅ (`pof generate`) |
 > | Self-healing CI (авто-PR) | — | — | ✅ (`--create-pr`, human-approval) |
 >
-> ⏳ MCP-сервер написан и покрыт тестами в движке, но в публичный образ пока не
-> входит (`fastmcp` не входит в scanner-зависимости, команды `gsc mcp` нет).
-> Подключить его сегодня нельзя — раздел появится здесь, когда сервер доедет до образа.
->
-> Когда доедет: в MCP **не будет** деструктивных действий (auto-patch/PR) — осознанно,
-> они остаются в CLI/human-лупе. `verify_finding` перезапускает PoC в sandbox, то есть
-> по побочным эффектам это не «чисто read-only».
+> В MCP **нет** деструктивных действий (auto-patch/PR) — осознанно, они остаются
+> в CLI/human-лупе. `verify_finding` перезапускает PoC в sandbox, то есть по
+> побочным эффектам это не «чисто read-only».
 
 ### Что уже внутри (код, а не план)
 
@@ -236,16 +229,50 @@ self-learning: разметка по фиксированной сети + ди�
 
 ## 🔌 Интеграции
 
+### MCP — подключи GSC к Claude Code / Cursor / Codex
+
+Движок отдаёт 6 read-only инструментов по MCP: `scan_repo`, `scan_diff`,
+`list_findings`, `get_finding`, `verify_finding`, `list_detectors`.
+Сервер уже внутри образа — `.mcp.json` в корне проекта (Claude Code):
+
+```json
+{
+  "mcpServers": {
+    "gsc": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i",
+               "-v", "${PWD}:/repo:ro",
+               "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
+      "env": { "GSC_ALLOWED_ROOTS": "/repo" }
+    }
+  }
+}
+```
+
+Cursor и любой другой MCP-клиент — та же форма (`command` + `args`).
+По умолчанию транспорт `stdio`; всё не-протокольное идёт в stderr.
+
+HTTP (общий сервер, токен обязателен — fail-closed):
+
+```bash
+docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
+  ghcr.io/poliakarmai/gsc-scanner:v1 mcp --transport http --host 0.0.0.0 --port 8001
+```
+
+> ⚠️ **На том конце — агент.** Деструктивных действий в MCP нет (ни auto-patch,
+> ни PR — они в CLI/human-лупе). `verify_finding` **исполняет PoC** в sandbox
+> (rlimit на CPU/RAM/procs/fsize, whitelist env, опционально контейнер с
+> egress-deny и read-only rootfs) — это запуск кода, а не чтение.
+> `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
+
 ### Paperclip — «найми GSC как сотрудника по безопасности»
 
 [Paperclip](https://github.com/paperclipai/paperclip) (79K★, open-source оркестратор AI-агентов)
 подключает GSC через MCP Tool Gateway — любой нанятый агент (Claude Code / Codex / Hermes)
 получает GSC-инструменты и роль «Security Engineer».
 
-> ⏳ **Интеграция готова в движке, но не в публичной поставке.** MCP-сервер
-> (6 инструментов: `scan_repo` · `scan_diff` · `list_findings` · `verify_finding` ·
-> `get_finding` · `list_detectors`) ещё не входит в публичный образ — см. раздел
-> «MCP» выше. Сценарий ниже заработает, когда сервер доедет до образа.
+> 📦 Интеграция идёт через MCP-сервер образа (см. раздел MCP выше); гайд и skill
+> `gsc-security-review` — в `docs/integrations/paperclip/` (репозиторий gsc-core).
 - **Транспорт:** `local_stdio` (subprocess) или `mcp_remote` (HTTP)
 
 Подключение за минуты: зарегистрируй `ToolStdioCommandTemplate`, создай gateway — и GSC сканирует репозитории твоей Paperclip-компании.

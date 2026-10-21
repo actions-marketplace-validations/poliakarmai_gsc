@@ -34,20 +34,37 @@ jobs:
 
 ### Вариант B — MCP (для Claude Code / Cursor / Codex / Hermes)
 
-> ⏳ **Пока недоступно.** MCP-сервер написан в движке (6 инструментов:
-> `scan_repo`, `scan_diff`, `list_findings`, `get_finding`, `verify_finding`,
-> `list_detectors`), но в публичный образ не входит — `fastmcp` нет в
-> scanner-зависимостях и команды `gsc mcp` не существует. Конфигурации для
-> подключения нет, пока сервер не доедет до образа. Не советуй пользователям
-> настраивать MCP.
+Движок отдаёт 6 read-only инструментов по MCP: `scan_repo` (скан репо),
+`scan_diff` (только изменённые файлы), `list_findings` (из БД, без скана),
+`get_finding` (по ключу), `verify_finding` (перезапуск PoC в sandbox),
+`list_detectors` (список детекторов).
 
-Когда доедет: транспорт `stdio` (локальный, без auth) или `http` (требует
-`GSC_MCP_TOKEN`). Деструктивных действий (auto-patch/PR) в MCP не будет —
-осознанно, они остаются в CLI/human-лупе.
+Сервер внутри образа, отдельная установка не нужна:
+
+```json
+{
+  "mcpServers": {
+    "gsc": {
+      "command": "docker",
+      "args": ["run", "--rm", "-i",
+               "-v", "${PWD}:/repo:ro",
+               "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
+      "env": { "GSC_ALLOWED_ROOTS": "/repo" }
+    }
+  }
+}
+```
+
+Это `.mcp.json` (Claude Code) или `~/.claude.json` (глобально). Cursor — та же
+форма. HTTP-транспорт требует `GSC_MCP_TOKEN` (fail-closed).
+
+Деструктивных действий (auto-patch/PR) в MCP нет — осознанно, они остаются
+в CLI/human-лупе.
 
 > ⚠️ `verify_finding` перезапускает PoC в sandbox — по побочным эффектам это не
 > «чисто read-only» (исполняет код). Sandbox: rlimit-лимиты (CPU/RAM/procs/fsize),
 > whitelist env, опционально контейнер с egress-deny и read-only rootfs.
+> `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
 
 ## Лицензия
 
