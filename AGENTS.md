@@ -25,6 +25,7 @@ jobs:
       - uses: poliakarmai/gsc@v1
         with:
           fail_on_critical: false
+          # fail_on_score: 80      # опционально: упасть, если score ниже порога
 ```
 
 Скан запускается автоматически на каждый PR: комментарий с находками
