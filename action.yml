@@ -87,15 +87,32 @@ runs:
         import json, os
         with open(os.environ["GITHUB_WORKSPACE"] + "/gsc_report.json") as f:
             data = json.load(f)
-        crit = sum(1 for x in data if (x.get("severity") or x.get("category") or "").upper() == "CRITICAL")
-        high = sum(1 for x in data if (x.get("severity") or x.get("category") or "").upper() == "HIGH")
+        # Dedup by code location, exactly like the PR-comment step. Overlapping
+        # detectors on one line must not multiply the penalty.
+        sev_of = lambda x: (x.get("severity") or x.get("category") or "").upper()
+        rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+        locs = {}
+        for x in data:
+            path = (x.get("file_path") or x.get("file") or "").replace("/repo/", "", 1)
+            line = x.get("line_number") or x.get("line") or 0
+            # A finding without a file is still a finding. Only collapse when we
+            # actually know the location — otherwise every pathless hit would
+            # merge into ":0" and silently disappear from the count.
+            key = (f"{path}:{line}" if path
+                   else f"?{x.get('title') or x.get('rule_id') or 'unknown'}:{x.get('rule_id') or ''}:{line}")
+            s = sev_of(x)
+            if key not in locs or rank.get(s, 9) < rank.get(locs[key], 9):
+                locs[key] = s
+        crit = sum(1 for s in locs.values() if s == "CRITICAL")
+        high = sum(1 for s in locs.values() if s == "HIGH")
         score = max(0, 100 - crit * 10 - high * 3)
         grade = "A+" if score >= 97 else "A" if score >= 90 else "B" if score >= 80 else "C" if score >= 70 else "D" if score >= 60 else "F"
-        print(f"score={score} grade={grade} critical={crit}")
+        print(f"score={score} grade={grade} critical={crit} high={high} locations={len(locs)}")
         with open(os.environ["GITHUB_OUTPUT"], "a") as o:
             o.write(f"score={score}\n")
             o.write(f"grade={grade}\n")
             o.write(f"critical={crit}\n")
+            o.write(f"high={high}\n")
         PY
       shell: bash
 
@@ -105,30 +122,62 @@ runs:
       with:
         script: |
           const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/gsc_report.json', 'utf8'));
+          const raw = JSON.parse(fs.readFileSync(process.env.GITHUB_WORKSPACE + '/gsc_report.json', 'utf8'));
           const sev = f => (f.severity || f.category || 'LOW').toUpperCase();
-          const crit = report.filter(f => sev(f) === 'CRITICAL');
-          const high = report.filter(f => sev(f) === 'HIGH');
+          // The engine reports absolute container paths (/repo/x.py). Strip to repo-relative
+          // so the comment matches the GitHub diff. Also unify `file_path` / `file`.
+          const path = f => String(f.file_path || f.file || '').replace(/^\/repo\//, '').replace(/\//g, '/');
+          // One code location can trip several overlapping detectors (e.g. GS001 + GS037 on
+          // the same secret). Collapse them to one row per file:line, keeping the highest
+          // severity and listing the detector titles underneath.
+          const rank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
+          const byLoc = new Map();
+          for (const f of raw) {
+            const p = path(f);
+            const line = f.line_number ?? f.line ?? 0;
+            // Pathless findings must not all collapse into one ":0" bucket — that
+            // would hide real findings from the comment. Key them by title+rule
+            // (two hits at the same pathless location are usually distinct rules).
+            const loc = p ? `${p}:${line}` : `?${f.title || f.rule_id || 'unknown'}:${f.rule_id || ''}:${line}`;
+            const shown = p ? `${p}:${line}` : (f.title || f.rule_id || 'repository');
+            const cur = byLoc.get(loc);
+            const s = sev(f);
+            if (!cur) {
+              byLoc.set(loc, { loc, shown, sev: s, titles: [f.title || f.pattern_title || 'finding'] });
+            } else {
+              if ((rank[s] ?? 9) < (rank[cur.sev] ?? 9)) cur.sev = s;
+              if (f.title && !cur.titles.includes(f.title)) cur.titles.push(f.title);
+            }
+          }
+          const report = [...byLoc.values()];
+          const crit = report.filter(f => f.sev === 'CRITICAL');
+          const high = report.filter(f => f.sev === 'HIGH');
+          const other = report.filter(f => f.sev !== 'CRITICAL' && f.sev !== 'HIGH');
           const maxItems = parseInt('${{ inputs.max_findings_to_comment }}');
+
+          // Every row rendered below is counted in the table — no phantom totals.
+          const row = f => `- **${f.titles[0]}** \`${f.shown}\`` +
+            (f.titles.length > 1 ? ` _+${f.titles.length - 1} more: ${f.titles.slice(1).join(', ')}_` : '') + '\n';
 
           let body = '## 🔍 GSC Security Audit\n\n';
           body += `| Severity | Count |\n|----------|-------|\n`;
           body += `| 🔴 CRITICAL | ${crit.length} |\n`;
           body += `| 🟠 HIGH | ${high.length} |\n`;
+          body += `| ⚪ MEDIUM/LOW | ${other.length} |\n`;
           body += `| **Total** | **${report.length}** |\n\n`;
 
           if (crit.length > 0) {
             body += '### 🚨 Critical\n';
-            for (const f of crit.slice(0, maxItems)) {
-              body += `- **${f.title}** \`${f.file_path}:${f.line_number}\`\n`;
-            }
-            if (crit.length > maxItems) body += `\n*...${crit.length - maxItems} more*\n`;
+            for (const f of crit.slice(0, maxItems)) body += row(f);
+            if (crit.length > maxItems) body += `\n*...${crit.length - maxItems} more critical (not shown)*\n`;
           }
           if (high.length > 0) {
             body += '\n### ⚠️ High\n';
-            for (const f of high.slice(0, maxItems)) {
-              body += `- **${f.title}** \`${f.file_path}:${f.line_number}\`\n`;
-            }
+            for (const f of high.slice(0, maxItems)) body += row(f);
+            if (high.length > maxItems) body += `\n*...${high.length - maxItems} more high (not shown)*\n`;
+          }
+          if (other.length > 0 && crit.length === 0 && high.length === 0) {
+            body += `\n${other.length} MEDIUM/LOW finding(s) — no CRITICAL or HIGH.\n`;
           }
 
           body += '\n---\n*GSC — [poliakarmai/gsc](https://github.com/poliakarmai/gsc)*';
