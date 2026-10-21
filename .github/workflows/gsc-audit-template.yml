@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2 (pinned, GSC-009)
 
       - name: GSC Security Audit
-        uses: poliakarmai/gsc@74cda49d7519270dd69b04fe449cbc445544fa84  # v1 (pinned to immutable SHA)
+        uses: poliakarmai/gsc@485395fcad46fdcf6340926d5c3c3f801dfaffa5  # v1 (pinned to immutable SHA)
         with:
           path: '.'
           deep_scan: true
