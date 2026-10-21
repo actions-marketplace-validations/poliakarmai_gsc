@@ -68,9 +68,10 @@ jobs:
 >   docker/podman, поэтому PoC идёт в том же контейнере под rlimit, а статус
 >   помечается `unverified`, а не `verified`. Изоляция — только с проброшенным
 >   `docker.sock` и образом `gsc-sandbox`.
-> - `scan_repo` — единственный тул, который реально сканирует. Находки **не
->   пишутся в БД**, поэтому `list_findings` вернёт `[]`, а `get_finding` /
->   `verify_finding` их не найдут (пересчитывают скан, ~30–60 с).
+> - `scan_repo` — единственный тул, который реально сканирует, и он же сохраняет
+>   находки в БД (`persisted: true`). `list_findings` и `get_finding` видят их
+>   сразу; `get_finding` отвечает из БД (`source: "database"`). Пересканирование
+>   (~30–60 с) — только когда ключа в БД нет.
 > - Нужен writable volume на `/app/.hermes/state` (там SQLite). `--read-only` не
 >   использовать — БД молча не создастся.
 > - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.

@@ -271,10 +271,10 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 >   rlimit-лимитами, а результат помечается `unverified`, а не `verified`.
 >   Нужна настоящая изоляция — пробросьте `docker.sock` и образ `gsc-sandbox`.
 > - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
-> - `scan_repo` — единственный тул, который реально сканирует. `get_finding` и
->   `verify_finding` **не находят** его результаты: находки не пишутся в БД
->   (получают ключи только через `gsc scan --with-poc`), а сами эти тулы
->   пересчитывают скан (~30–60 с). `list_findings` вернёт `[]`, пока БД пуста.
+> - `scan_repo` сохраняет находки в БД (`persisted: true` в ответе), поэтому
+>   `list_findings` и `get_finding` их видят сразу. `get_finding` отвечает из БД
+>   (`source: "database"`), без пересканирования; ~30–60 с — только если ключа
+>   в БД нет и он пересобирает скан.
 > - Нужен writable volume на `/app/.hermes/state` — там SQLite; на read-only FS
 >   БД молча не создаётся. `--read-only` не использовать.
 > - Без `llm_api_key`/`DEEPSEEK_API_KEY` работают только regex-детекторы.

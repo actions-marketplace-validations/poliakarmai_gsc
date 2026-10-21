@@ -101,9 +101,10 @@ Safety notes, because an agent is on the other end:
   under rlimits and the verdict is marked `unverified`, not `verified`. For real
   isolation pass `docker.sock` plus the `gsc-sandbox` image.
 - `GSC_ALLOWED_ROOTS` confines `scan_repo`/`scan_diff` to mounted paths.
-- `scan_repo` is the only tool that actually scans. Findings are **not saved to
-  the database**, so `list_findings` returns `[]` and `get_finding` /
-  `verify_finding` cannot find scan results (they re-run a scan, ~30–60 s).
+- `scan_repo` is the only tool that actually scans, and it persists findings to
+  the database (`persisted: true`). `list_findings` and `get_finding` see them
+  immediately; `get_finding` answers from the DB (`source: "database"`).
+  Re-scanning (~30–60 s) only happens when the key is not in the DB.
 - Mount a writable volume at `/app/.hermes/state` (SQLite lives there). Do not
   use `--read-only`: the database fails to initialise silently.
 
