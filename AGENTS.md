@@ -1,6 +1,6 @@
 # AGENTS.md — GSC для AI-агентов
 
-GSC — SAST-сканер: 69 детекторов (SAST · SCA · Secrets · IaC), PoC (доказанный
+GSC — SAST-сканер: 70 детекторов (SAST · SCA · Secrets · IaC), PoC (доказанный
 эксплойт), Proof-of-Fix (верифицированный фикс), self-healing CI.
 
 ## Как подключить GSC
@@ -34,7 +34,7 @@ jobs:
 
 ### Вариант B — MCP (для Claude Code / Cursor / Codex / Hermes)
 
-Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию; `verify_finding` исполняет PoC — но только там, где есть docker/podman, см. границы ниже): `scan_repo` (скан репо),
+Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию; `verify_finding` исполняет PoC в bubblewrap-песочнице внутри образа, см. границы ниже): `scan_repo` (скан репо),
 `scan_diff` (только изменённые файлы), `list_findings` (из БД, без скана),
 `get_finding` (по ключу), `verify_finding` (перезапуск PoC в sandbox),
 `list_detectors` (список детекторов).
@@ -47,6 +47,8 @@ jobs:
     "gsc": {
       "command": "docker",
       "args": ["run", "--rm", "-i",
+               "--security-opt", "seccomp=unconfined",
+               "--security-opt", "apparmor=unconfined",
                "-v", "${PWD}:/repo:ro",
                "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
@@ -62,14 +64,17 @@ jobs:
 Деструктивных действий (auto-patch/PR) в MCP нет — осознанно, они остаются
 в CLI/human-лупе.
 
-> ⚠️ Честно о границах (проверено в пересобранном образе):
-> - `verify_finding` **не исполняет PoC в этом образе**. Гейты в коде реальные
->   (DESTRUCTIVE и недетерминированные PoC отклоняются), а без OS-изоляции движок
->   fail-closed: docker/podman в образе нет, поэтому PoC не запускается вовсе и
->   тул отвечает `status: "unavailable"` + hint. Это **не** «не воспроизводится» —
->   о самой находке такой ответ не говорит ничего. Реальный прогон PoC — только
->   CLI на хосте с docker/podman. Проброс `docker.sock` в этот контейнер — не
->   изоляция, а выдача PoC хостового демона (эквивалент root): не делать.
+> ⚠️ Честно о границах (проверено в пересобранном образе 25.10.2026):
+> - `verify_finding` исполняет PoC **внутри образа** через bubblewrap: mount/pid/net/user
+>   namespaces, пустой env, read-only системные деревья, writable только workspace,
+>   `--die-with-parent`. Docker/podman-демон не нужен. Живой прогон: `NET_DENIED`,
+>   uid 999, `/repo` из песочницы не виден.
+> - **Нужны два флага контейнера:** `--security-opt seccomp=unconfined --security-opt apparmor=unconfined`.
+>   Без них ядро не даёт создать user-namespace и тул отвечает `status: "unavailable"` —
+>   честно (PoC не запускался), а **не** «не воспроизводится».
+>   Гейты в коде реальные: DESTRUCTIVE и недетерминированные PoC отклоняются.
+> - Проброс `docker.sock` в этот контейнер — не изоляция, а выдача PoC хостового
+>   демона (эквивалент root): не делать.
 > - `scan_repo` ограничен: свип детекторов — `GSC_SCAN_TIMEOUT` (default 300 с),
 >   инвентарь файлов — `GSC_MAX_FILES` (default 50 000). При упоре в лимит ответ
 >   приходит со `status: "partial"`, `truncated: true` и списком детекторов,
