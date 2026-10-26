@@ -34,10 +34,18 @@ jobs:
 
 ### Вариант B — MCP (для Claude Code / Cursor / Codex / Hermes)
 
-Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию; `verify_finding` исполняет PoC в bubblewrap-песочнице внутри образа, см. границы ниже): `scan_repo` (скан репо),
+Движок отдаёт 7 инструментов по MCP (read-only по отношению к репозиторию; `verify_finding` исполняет PoC в bubblewrap-песочнице внутри образа, см. границы ниже): `scan_repo` (скан репо),
 `scan_diff` (только изменённые файлы), `list_findings` (из БД, без скана),
 `get_finding` (по ключу), `verify_finding` (перезапуск PoC в sandbox),
+`verify_fix` (сработала ли правка: `fixed` / `still_vulnerable` / `inconclusive`),
 `list_detectors` (список детекторов).
+
+Всё, что сканирует, отвечает `scan_status: ok|partial` + `truncated` + `skipped_detectors`:
+`partial` = упёрлись в `GSC_SCAN_TIMEOUT`/`GSC_MAX_FILES`, и мало находок там **не значит** «чисто».
+`verify_finding` пишет `scan_status: "not_run"` и `poc_from_db: true`, когда отдаёт
+сохранённый PoC без скана. `verify_fix` со статусом `fixed` — это доказательство
+пересканом, а не эксплойтом (GSC-003): «детектор больше не срабатывает». Неизвестный
+ключ → `error_code: NOT_FOUND`, а не «исправлено».
 
 Сервер внутри образа, отдельная установка не нужна:
 
@@ -80,10 +88,18 @@ jobs:
 >   приходит со `status: "partial"`, `truncated: true` и списком детекторов,
 >   которые не запускались — мало находок там **не значит** «чисто».
 >   Truncated-скан в БД не сохраняется.
-> - `scan_repo` — единственный тул, который реально сканирует, и он же сохраняет
->   находки в БД (`persisted: true`). `list_findings` и `get_finding` видят их
->   сразу; `get_finding` отвечает из БД (`source: "database"`). Пересканирование
->   (~30–60 с) — только когда ключа в БД нет.
+> - `scan_repo` сканирует и сохраняет находки в БД (`persisted: true`) вместе с PoC
+>   (`pocs_persisted`) — поэтому `verify_finding` берёт PoC по ключу и **не пересканирует**
+>   репозиторий (`scan_status: "not_run"`, `poc_from_db: true`); полный скан остаётся только
+>   fallback'ом для ключа, которого в БД нет. `list_findings` и `get_finding` видят сохранённое
+>   сразу (`source: "database"`); `get_finding` пересканирует (~30–60 с) лишь когда ключа в БД нет.
+>   PoC движок прикрепляет не всем находкам (нужен `confidence ≥ 0.80` и шаблон под правило),
+>   так что часть вызовов `verify_finding` всё равно уйдёт в скан.
+> - Скан кэшируется по **контент-фингерпринту** дерева (HEAD + грязные файлы), подкаталог
+>   `mcp_scan_cache/<profile>-<mode>` на state-томе: повторный скан того же дерева — 0 с,
+>   после правки без коммита кэш инвалидируется. `GSC_MCP_SCAN_CACHE=off` отключает.
+>   Сканы сериализованы host-wide локом (`GSC_MCP_SCAN_LOCK_TIMEOUT`, 900 с; занято →
+>   `error_code: UNAVAILABLE`) — параллельный агент не выжирает CPU.
 > - Нужен **writable** volume на `/app/.hermes/state` (там SQLite). Docker создаёт
 >   его от root, а процесс идёт под uid 999 — сначала
 >   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
