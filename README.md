@@ -1,7 +1,6 @@
 # 🛡️ GSC — Git Security Checker
 
 [![GSC on GitHub Marketplace](https://img.shields.io/badge/Marketplace-GSC%20Security%20Audit-blue)](https://github.com/marketplace/actions/gsc-security-audit)
-[![HOL Guard Scanner](https://img.shields.io/badge/HOL%20Guard-passing-00a67e)](https://github.com/hashgraph-online/hol-guard)
 [![Plugin Security Scan](https://github.com/poliakarmai/gsc/actions/workflows/plugin-scan.yml/badge.svg)](https://github.com/poliakarmai/gsc/actions/workflows/plugin-scan.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
@@ -13,22 +12,32 @@
 detect → prove → fix → verify → heal → learn
 ```
 
+```console
+$ gsc scan . --ci --json
+[{"rule_id": "GS001", "severity": "CRITICAL", "title": "Hardcoded API key",
+  "file_path": "app.py", "line": 1, "fix_suggestion": "Move this value to an env var"}]
+```
+
 Most scanners report matches. GSC **proves them**: every finding can be turned into a
 runnable proof-of-concept, validated in a sandbox, then fixed and re-verified by
 re-running the exploit.
 
 **What makes it different:**
 
-- **69 detectors** across SAST, SCA, secrets and IaC — plus a YAML rule DSL.
+- **67 detectors** across SAST, SCA, secrets and IaC — plus a YAML rule DSL.
 - **PoC auto-generation** with a safe-exploitation gate: a finding ships with a working exploit, not just a line number.
 - **Proof-of-Fix** — a patch is only accepted after the exploit stops firing in a sandbox.
 - **Self-learning** — detectors are re-scored nightly against a calibration network; noisy patterns are auto-deactivated at <30% TP. Federated feedback is privacy-first (`{tenant_hash, rule_id, tp, fp}` + DP noise).
 - **Priority by exploitability, not CVSS** — EPSS + CISA KEV + ExploitDB.
 - **BYO-LLM** — the engine, detectors and PoC logic are ours; LLM revalidation runs on *your* key (any OpenAI-compatible endpoint, including a local Ollama). No key → fast regex-only mode.
 
+**Who it is for:** platform/DevSecOps teams that need findings *proven* before a PR blocks;
+AppSec engineers triaging noisy regex output; AI coding agents that need a scanner tool over MCP.
+
 **Use it as a GitHub Action** (see below), from the **CLI / Docker image**, or as an
-**MCP server** for AI coding agents — six tools (`scan_repo`, `scan_diff`,
-`list_findings`, `get_finding`, `verify_finding`, `list_detectors`) over stdio or HTTP.
+**MCP server** for AI coding agents — ten tools (`scan_repo`, `scan_diff`,
+`list_findings`, `get_finding`, `get_poc`, `verify_finding`, `verify_findings`,
+`verify_fix`, `doctor`, `list_detectors`) over stdio or HTTP.
 Read-only towards your repository: no patching, no PRs, no writes to the working tree.
 (`verify_finding` does execute a PoC — see the safety notes in the MCP section.)
 
@@ -62,14 +71,14 @@ projects and aggregating the same way. No clean-room comparison against other ve
 closed Docker image `ghcr.io/poliakarmai/gsc-scanner` under **BSL 1.1** (free to scan your own
 repos; competing SaaS requires a commercial license; converts to Apache-2.0 on 2030-08-06).
 
-### Case study: XSS in a 122★ OSINT platform (stars as of 2026-08-08)
+### Case study: XSS in a 698★ OSINT platform (stars as of 2026-10-26)
 
 First public proof — [`stanfrbd/cyberbro`](https://github.com/stanfrbd/cyberbro) (46,677 LOC, 281 files):
 
 | | |
 |---|---|
-| Finding | **CWE-79** XSS via search highlight — `static/history.js:148`, `p.innerHTML = p.title.replace(...)` |
-| Severity | HIGH (CVSS 7.5) |
+| Finding | **CWE-79** XSS via search highlight — `static/history.js:50`, `p.innerHTML = p.title.replace(...)` |
+| Severity | MEDIUM (CVSS 5.4) — reflected XSS без аутентификации |
 | Detector | **GS020** (`gs020_xss_injection`) |
 | Fix | 9 lines, 1 file — exploit re-run in sandbox confirms it no longer fires |
 
@@ -135,7 +144,7 @@ jobs:
 **Выходы:** `score` (0–100) и `grade` (A+ … F).
 
 > Комментарий в PR считает находки **по локациям** (`file:line`), а не по
-> срабатываниям детекторов: один секрет, пойманый четырьмя правилами, — это
+> срабатываниям детекторов: один секрет, пойманный четырьмя правилами, — это
 > одна строка с перечислением правил, а не четыре. `Total` в таблице всегда
 > равен сумме категорий.
 
@@ -148,12 +157,27 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 ```
 Без ключа — быстрый regex-only скан (уязвимости находит; confirmed-вердикты — с ключом).
 
+### Локально: CLI или Docker
+
+```bash
+gsc scan . --ci --json          # JSON-находки в stdout
+gsc scan . --fail-on-blocking   # exit 1 при CRITICAL/HIGH — гейт для pre-commit / CI
+```
+
+```bash
+# тот же движок без установки
+docker run --rm -v "$PWD:/repo:ro" ghcr.io/poliakarmai/gsc-scanner:v1 scan /repo --ci --json
+```
+
+`scan` — точка входа; `pof` (Proof-of-Fix), `verify-fix`, `report`, `--compliance …`
+и остальные ≈80 подкоманд — в `gsc --help`.
+
 ## Что умеет
 
 | Слой | Возможности |
 |---|---|
-| **SAST** | 69 детекторов (SAST · SCA · Secrets · IaC), YAML rule DSL, LLM-триаж с confidence scoring |
-| **Доказательство** | PoC auto-generation — рабочий эксплойт для находки *(движок; CLI/engine, не MCP)* |
+| **SAST** | 67 детекторов (SAST · SCA · Secrets · IaC), YAML rule DSL, LLM-триаж с confidence scoring |
+| **Доказательство** | PoC auto-generation — рабочий эксплойт для находки *(CLI `--with-poc`, MCP `get_poc`/`verify_finding`)* |
 | **Исправление** | Proof-of-Fix — патч верифицируется перезапуском эксплойта в sandbox; self-healing CI (авто-PR) *(CLI, требует явного флага)* |
 | **Приоритизация** | EPSS + CISA KEV + ExploitDB (не сырой CVSS), БДУ ФСТЭК |
 | **Recon** | passive reconnaissance: subdomain / tech / DNS / HTTP |
@@ -176,18 +200,20 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 
 ### Что уже внутри (код, а не план)
 
+Исходники движка в публичном репо не публикуются (закрытый образ, BSL 1.1) — колонка «Где» называет модуль, а не путь в этом репозитории.
+
 | Механика | Где | Что делает |
 |---|---|---|
-| **Мутационный re-attack PoF** | `gsc_cli/gsc_poc_mutator.py` → `gsc_proofoffix.py` | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
-| **Positive control + taint-recheck** | `gsc_pof_sandbox.py`, `tests/test_taint_recheck.py` | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
-| **OS-изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) на хосте, **bubblewrap внутри образа** (`--unshare-all`: mount/pid/net/user/ipc/uts, `--clearenv`, read-only системные деревья, writable только workspace, `--die-with-parent`) — докер-демон и проброс сокета не нужны. Уровень изоляции (`docker` / `podman` / `bwrap`) возвращается в каждом результате и в ответе `verify_finding` (`isolation`); без OS-изоляции движок fail-closed и отвечает `unavailable`, а не «не воспроизводится» |
-| **Quick-режим без LLM** | `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
+| **Мутационный re-attack PoF** | движок: PoC-мутатор → Proof-of-Fix | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
+| **Positive control + taint-recheck** | движок: PoF-sandbox + taint-recheck тесты | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
+| **OS-изоляция hostile-PoC** | движок: `_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) на хосте, **bubblewrap внутри образа** (`--unshare-all`: mount/pid/net/user/ipc/uts, `--clearenv`, read-only системные деревья, writable только workspace, `--die-with-parent`) — докер-демон и проброс сокета не нужны. Уровень изоляции (`docker` / `podman` / `bwrap`) возвращается в каждом результате и в ответе `verify_finding` (`isolation`); без OS-изоляции движок fail-closed и отвечает `unavailable`, а не «не воспроизводится» |
+| **Quick-режим без LLM** | CLI: `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
 
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
 
 GSC — это **движок + детекторы + PoC**, а не очередная обёртка над LLM.
 
-- **От GSC:** 69 детекторов, V3-scoring, FP-фильтр, PoC/PoF, self-learning — закрытый IP в Docker-образе.
+- **От GSC:** 67 детекторов, V3-scoring, FP-фильтр, PoC/PoF, self-learning — закрытый IP в Docker-образе.
 - **От вас:** LLM-ключ (любой OpenAI-совместимый — DeepSeek/OpenRouter/GMI/локальный Ollama).
 
 Почему это выгодно вам:
@@ -200,7 +226,7 @@ GSC — это **движок + детекторы + PoC**, а не очеред
 Помимо BYO-LLM у GSC есть **замкнутый контур обучения без LLM** (0 токенов, детерминированный):
 
 ```
-скан → авто-разметка findings по calibration-сети (16 проектов: 9 clean + 7 vuln)
+скан → авто-разметка findings по calibration-сети (13 проектов: 9 clean + 4 vuln)
      → авто-деактивация шумных паттернов (<30% TP)
      → пополнение эталонов из security-фидов
      → federated feedback (приватно: только {tenant_hash, rule_id, tp, fp} + DP-шум)
@@ -232,9 +258,10 @@ self-learning: разметка по фиксированной сети + ди�
 
 ### MCP — подключи GSC к Claude Code / Cursor / Codex
 
-Движок отдаёт 6 инструментов по MCP (read-only по отношению к репозиторию — не патчит
-и не делает PR; `verify_finding` исполняет PoC там, где есть docker/podman — см. границы ниже): `scan_repo`, `scan_diff`,
-`list_findings`, `get_finding`, `verify_finding`, `list_detectors`.
+Движок отдаёт 10 инструментов по MCP (read-only по отношению к репозиторию — не патчит
+и не делает PR; `verify_finding` исполняет PoC в bubblewrap-песочнице внутри образа — см. границы ниже): `scan_repo`,
+`scan_diff`, `list_findings`, `get_finding`, `get_poc`, `verify_finding`, `verify_findings`,
+`verify_fix`, `doctor`, `list_detectors`.
 Сервер уже внутри образа — `.mcp.json` в корне проекта (Claude Code):
 
 ```json
@@ -243,6 +270,8 @@ self-learning: разметка по фиксированной сети + ди�
     "gsc": {
       "command": "docker",
       "args": ["run", "--rm", "-i",
+               "--security-opt", "seccomp=unconfined",
+               "--security-opt", "apparmor=unconfined",
                "-v", "${PWD}:/repo:ro",
                "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
@@ -258,9 +287,13 @@ Cursor и любой другой MCP-клиент — та же форма (`co
 HTTP (общий сервер, токен обязателен — fail-closed):
 
 ```bash
-docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
+docker run --rm -p 127.0.0.1:8001:8001 -e GSC_MCP_TOKEN=your-secret \
   ghcr.io/poliakarmai/gsc-scanner:v1 mcp --transport http --host 0.0.0.0 --port 8001
 ```
+
+> ⚠️ `--host 0.0.0.0` слушает все интерфейсы контейнера: порт привязан к `127.0.0.1` намеренно.
+> Нужен доступ извне — ставьте перед сервером reverse-proxy с TLS, не публикуйте `-p 8001:8001`
+> в интернет: эндпоинт исполняет PoC.
 
 > ⚠️ **На том конце — агент, и честно о границах:**
 >
@@ -290,16 +323,17 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 >   `list_findings` и `get_finding` их видят сразу. `get_finding` отвечает из БД
 >   (`source: "database"`), без пересканирования; ~30–60 с — только если ключа
 >   в БД нет и он пересобирает скан.
-> - Нужен **writable** volume на `/app/.hermes/state` — там SQLite. Docker создаёт
->   volume от root, а процесс идёт под uid 999, поэтому сначала отдайте права:
->   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
->   Без этого `scan_repo` вернёт `persisted: false` (скан работает, БД — нет),
->   а `--read-only` вообще не годится.
+> - Нужен **writable** volume на `/app/.hermes/state` — там SQLite. Каталог уже есть в
+>   образе и принадлежит uid/gid 999, поэтому `-v gsc-state:/app/.hermes/state` работает
+>   сразу. Ритуал `chown` нужен только для томов, созданных до v1.4.1 (там каталог от root):
+>   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`, либо просто
+>   `docker volume rm gsc-state` и создать заново. Без этого `scan_repo` вернёт
+>   `persisted: false` (скан работает, БД — нет), а `--read-only` вообще не годится.
 > - Без `llm_api_key`/`DEEPSEEK_API_KEY` работают только regex-детекторы.
 
 ### Paperclip — «найми GSC как сотрудника по безопасности»
 
-[Paperclip](https://github.com/paperclipai/paperclip) (79K★, open-source оркестратор AI-агентов)
+[Paperclip](https://github.com/paperclipai/paperclip) (107K★, open-source оркестратор AI-агентов)
 подключает GSC через MCP Tool Gateway — любой нанятый агент (Claude Code / Codex / Hermes)
 получает GSC-инструменты и роль «Security Engineer».
 
@@ -321,5 +355,8 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 - **Change Date 2030-08-06** → движок автоматически переходит на Apache 2.0.
 
 Для демо, пилота или приобретения — свяжитесь с автором.
+
+**Участие и безопасность:** [CONTRIBUTING.md](CONTRIBUTING.md) (PRs welcome) ·
+[SECURITY.md](SECURITY.md) — приватный канал для уязвимостей, не публичный issue.
 
 © 2026 Алексей Поляков.

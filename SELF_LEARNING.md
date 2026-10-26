@@ -10,7 +10,7 @@ GSC замыкает петлю обучения, которую никто из
 ```
 скан репо
   → Ground-Truth Trainer: авто-разметка findings по calibration-сети
-    (16 проектов: 9 clean + 7 vuln = эталон TP/FP, без LLM)
+    (13 проектов: 9 clean + 4 vuln = эталон TP/FP, без LLM)
   → авто-деактивация шумных паттернов (<30% TP при ≥10 вердиктах)
   → пополнение эталонов из security-фидов (crypto watchlist → bounty_examples)
   → federated submit/fetch (privacy-first, DP-noised: только {tenant_hash, rule_id, tp, fp})

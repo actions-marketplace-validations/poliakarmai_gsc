@@ -7,7 +7,7 @@ This file is for AI agents and LLM crawlers. Human docs: [README.md](README.md).
 
 ## What it does
 
-- **69 detectors** — SAST, SCA (OSV.dev), Secrets, IaC
+- **67 detectors** — SAST, SCA (OSV.dev), Secrets, IaC
 - **PoC auto-generation** — рабочий эксплойт, доказывающий находку
 - **Proof-of-Fix** — патч считается исправлением только если эксплойт перестал срабатывать
 - **Self-healing CI** — авто-PR с фиксом (только CLI, требует явного флага)
@@ -52,7 +52,7 @@ Other commands: `gsc --help` (≈80 subcommands: `sca`, `iac`, `secrets`,
 
 ### 3. MCP server — connect an AI coding agent
 
-The engine image ships an MCP server with six tools (read-only towards your repo; `verify_finding` would run a PoC — see the safety notes below):
+The engine image ships an MCP server with ten tools (read-only towards your repo; `verify_finding` runs a PoC in an in-image bubblewrap sandbox — see the safety notes below):
 
 | Tool | What it does |
 | --- | --- |
@@ -60,7 +60,11 @@ The engine image ships an MCP server with six tools (read-only towards your repo
 | `scan_diff` | Scan only files changed vs a git base ref (PR review) |
 | `list_findings` | Read recent findings from the local database (no scan) |
 | `get_finding` | Full detail of one finding by `finding_key` |
+| `get_poc` | Return a finding's PoC (from DB or the deterministic template) |
 | `verify_finding` | Re-run a finding's PoC in the sandbox, report exploit status |
+| `verify_findings` | Same, for a batch of finding keys |
+| `verify_fix` | Re-scan after a patch: `fixed` / `still_vulnerable` / `inconclusive` |
+| `doctor` | Self-check: sandbox, state volume, allowed roots, cache, lock |
 | `list_detectors` | List detectors registered with the engine |
 
 **Claude Code** — add to `.mcp.json` (project) or `~/.claude.json` (global):
@@ -71,6 +75,8 @@ The engine image ships an MCP server with six tools (read-only towards your repo
     "gsc": {
       "command": "docker",
       "args": ["run", "--rm", "-i",
+               "--security-opt", "seccomp=unconfined",
+               "--security-opt", "apparmor=unconfined",
                "-v", "${PWD}:/repo:ro",
                "-v", "gsc-state:/app/.hermes/state",
                "ghcr.io/poliakarmai/gsc-scanner:v1", "mcp"],
@@ -138,7 +144,7 @@ Outputs: `score` (0–100), `grade` (A+ … F).
 ## MCP (AI coding agents)
 
 Shipped. See section 3 above: `docker run ... gsc-scanner:v1 mcp` speaks MCP over
-stdio; six tools. No code from the closed-source engine is published —
+stdio; ten tools. No code from the closed-source engine is published —
 the server runs inside the image.
 
 ## Licensing (matters for agents generating advice)
