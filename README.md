@@ -166,8 +166,8 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 > | Возможность | Action | MCP | CLI / engine image |
 > |---|---|---|---|
 > | Скан (SAST/SCA/Secrets/IaC) | ✅ | ✅ | ✅ |
-> | PoC auto-generation | — | — | ✅ (`--with-poc`) |
-> | Proof-of-Fix | — | — | ✅ (`pof generate`) |
+> | PoC auto-generation | — | ✅ (`get_poc`, `verify_finding`) | ✅ (`--with-poc`) |
+> | Proof-of-Fix | — | ✅ (`verify_fix`) | ✅ (`pof generate`) |
 > | Self-healing CI (авто-PR) | — | — | ✅ (`--create-pr`, human-approval) |
 >
 > В MCP **нет** деструктивных действий (auto-patch/PR) — осознанно, они остаются
@@ -180,7 +180,7 @@ LLM-ревалидация — на вашем ключе (BYO-LLM):
 |---|---|---|
 | **Мутационный re-attack PoF** | `gsc_cli/gsc_poc_mutator.py` → `gsc_proofoffix.py` | после фикса PoC перезапускается в мутированных формах (url-encode, double-encode, HTML-entities, case-swap, tab/space) — ловит «залатали симптом, а не причину». Детерминированно, без LLM |
 | **Positive control + taint-recheck** | `gsc_pof_sandbox.py`, `tests/test_taint_recheck.py` | PoC обязан срабатывать на уязвимом варианте и молчать на исправленном |
-| **Контейнерная изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) + rlimit-fallback; уровень изоляции возвращается в каждом результате. **В публичном образе docker/podman нет** → движок fail-closed: PoC не исполняется вовсе, вердикт `unavailable` (это НЕ «не воспроизводится»); реальный прогон PoC — CLI на хосте с docker/podman. Проброс `docker.sock` — не изоляция, а выдача PoC хостового демона |
+| **OS-изоляция hostile-PoC** | `gsc_pof_sandbox.py::_isolation_backend()` | docker/podman (`--network none`, read-only, cap-drop, non-root) на хосте, **bubblewrap внутри образа** (`--unshare-all`: mount/pid/net/user/ipc/uts, `--clearenv`, read-only системные деревья, writable только workspace, `--die-with-parent`) — докер-демон и проброс сокета не нужны. Уровень изоляции (`docker` / `podman` / `bwrap`) возвращается в каждом результате и в ответе `verify_finding` (`isolation`); без OS-изоляции движок fail-closed и отвечает `unavailable`, а не «не воспроизводится» |
 | **Quick-режим без LLM** | `gsc external-scan --scan-mode quick` | regex-only: находки без LLM-вердиктов, 0 токенов |
 
 ## 🎯 Наша фишка: BYO-LLM — движок наш, судья твой
@@ -265,13 +265,21 @@ docker run --rm -p 8001:8001 -e GSC_MCP_TOKEN=your-secret \
 > ⚠️ **На том конце — агент, и честно о границах:**
 >
 > - Деструктивных действий нет: ни auto-patch, ни PR — они в CLI/human-лупе.
-> - `verify_finding` **не исполняет PoC в этом образе**. Гейты в коде реальные
->   (DESTRUCTIVE-PoC и недетерминированный PoC отклоняются), а без OS-изоляции
->   движок fail-closed: docker/podman внутри нет → PoC не запускается вовсе,
->   тул отвечает `status: "unavailable"` + hint. Это **не** «не воспроизводится»:
->   о самой находке такой ответ не говорит ничего. Реальный прогон — CLI на хосте
->   с docker/podman. Проброс `docker.sock` — не изоляция, а выдача PoC хостового
->   демона (эквивалент root): не делать.
+> - `verify_finding` **исполняет PoC в этом образе** — через bubblewrap
+>   (`--unshare-all`: mount/pid/net/user/ipc/uts, `--clearenv`, read-only системные
+>   деревья, writable только workspace). Докер-демон не нужен, проброс `docker.sock`
+>   не нужен и запрещён (это выдача PoC хостового демона, эквивалент root).
+>   Для user-namespace контейнеру нужны `--security-opt seccomp=unconfined
+>   --security-opt apparmor=unconfined`; без них тул честно отвечает
+>   `status: "unavailable"` (PoC не запускался — это не вердикт о находке).
+>   В ответе есть `isolation` (`bwrap` / `docker` / `podman`) и `exploit_success`.
+> - PoC прикрепляется к находке **при скане**: сначала детерминированный шаблон
+>   (curl-payload под класс уязвимости — работает и в regex-only режиме, без
+>   LLM-ключа и без `confidence`), затем LLM-PoC для находок с `confidence ≥ 0.80`.
+>   Шаблоны есть под XSS/SSTI, command injection, SQLi, path traversal, SSRF, IDOR,
+>   deserialization, XXE, open redirect; DESTRUCTIVE-шаблоны не прикрепляются никогда.
+>   Если PoC нет вообще — `verify_finding` отвечает `error_code: "UNAVAILABLE"` с
+>   текстом «no PoC attached», и это тоже **не** «не воспроизводится».
 > - `scan_repo` ограничен бюджетом: `GSC_SCAN_TIMEOUT` (default 300 с) на свип
 >   детекторов, `GSC_MAX_FILES` (default 50 000) на инвентарь. Упёрлись в лимит —
 >   в ответе `status: "partial"`, `truncated: true` и список детекторов, которые
