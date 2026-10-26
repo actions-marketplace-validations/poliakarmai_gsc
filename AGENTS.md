@@ -100,10 +100,12 @@ jobs:
 >   после правки без коммита кэш инвалидируется. `GSC_MCP_SCAN_CACHE=off` отключает.
 >   Сканы сериализованы host-wide локом (`GSC_MCP_SCAN_LOCK_TIMEOUT`, 900 с; занято →
 >   `error_code: UNAVAILABLE`) — параллельный агент не выжирает CPU.
-> - Нужен **writable** volume на `/app/.hermes/state` (там SQLite). Docker создаёт
->   его от root, а процесс идёт под uid 999 — сначала
->   `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
->   Иначе `persisted: false` (скан есть, БД нет). `--read-only` не подходит.
+> - Нужен **writable** volume на `/app/.hermes/state` (там SQLite). Каталог уже есть в
+>   образе и принадлежит uid/gid 999, поэтому `-v gsc-state:/app/.hermes/state` работает
+>   сразу — ритуал `chown` больше не нужен. Он остаётся только для томов, созданных
+>   до v1.4.1 (там каталог от root): `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`,
+>   либо просто `docker volume rm gsc-state` и создать заново. Без этого `persisted: false`
+>   (скан есть, БД нет). `--read-only` не подходит.
 > - `GSC_ALLOWED_ROOTS` ограничивает `scan_repo`/`scan_diff` смонтированными путями.
 
 ## Лицензия
