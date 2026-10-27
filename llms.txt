@@ -101,14 +101,16 @@ Safety notes, because an agent is on the other end:
 
 - **No destructive actions.** No auto-patch, no PR, no writes to your repo —
   deliberately kept out of MCP and left in the CLI/human loop.
-- `verify_finding` **would execute a PoC — but cannot in this image**. Code gates
-  are real (DESTRUCTIVE and non-deterministic PoCs are refused), and the engine is
-  fail-closed without OS isolation: this image ships no docker/podman, so the PoC
-  is **not executed at all** and the tool answers `status: "unavailable"` with a
-  hint. That verdict says nothing about the finding — it is not "not
-  reproducible". To actually run the PoC, use the CLI on a host with
-  docker/podman. Passing `docker.sock` into this container is *not* isolation: it
-  hands the PoC the host daemon (root-equivalent) — don't.
+- `verify_finding` **does execute the PoC — inside the image, in a bubblewrap
+  sandbox** (mount/pid/net/user namespaces, empty env, read-only system trees,
+  writable workspace only, `--die-with-parent`), so no docker/podman daemon is
+  needed inside the container. This requires the two container flags above
+  (`--security-opt seccomp=unconfined --security-opt apparmor=unconfined`);
+  without them the kernel refuses the user namespace and the tool answers
+  `status: "unavailable"` — honest ("the PoC did not run"), **not** "not
+  reproducible". Code gates are real: DESTRUCTIVE and non-deterministic PoCs are
+  refused. Passing `docker.sock` into this container is *not* isolation: it hands
+  the PoC the host daemon (root-equivalent) — don't.
 - `scan_repo` is bounded: a detector sweep is capped by `GSC_SCAN_TIMEOUT`
   (default 300s) and the file inventory by `GSC_MAX_FILES` (default 50,000). If
   either cap is hit the answer comes back with `status: "partial"`,
@@ -119,10 +121,12 @@ Safety notes, because an agent is on the other end:
   the database (`persisted: true`). `list_findings` and `get_finding` see them
   immediately; `get_finding` answers from the DB (`source: "database"`).
   Re-scanning (~30–60 s) only happens when the key is not in the DB.
-- Mount a **writable** volume at `/app/.hermes/state` (SQLite lives there). Docker
-  creates it owned by root while the process runs as uid 999, so chown it first:
-  `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s`.
-  Otherwise `scan_repo` returns `persisted: false`. Do not use `--read-only`.
+- Mount a **writable** volume at `/app/.hermes/state` (SQLite lives there). Since
+  v1.4.1 the directory exists in the image owned by uid/gid 999, so
+  `-v gsc-state:/app/.hermes/state` works as-is. The `chown` ritual is only
+  needed for volumes created before v1.4.1 (root-owned dir):
+  `docker run --rm -v gsc-state:/s --user 0 <image> chown -R 999:999 /s` — or just
+  `docker volume rm gsc-state` and let it be recreated. Do not use `--read-only`.
 
 ## Action inputs
 
@@ -154,6 +158,17 @@ the server runs inside the image.
   - scanning your own repos: always allowed
   - building a competing commercial SaaS: commercial licence required
   - Change Date 2030-08-06 → engine becomes Apache 2.0
+
+## Agent skills (installable)
+
+Three ready-made skills, one per workflow — same shape as `npx skills add`:
+
+- `skills/gsc-scan/SKILL.md` — scan a repo/PR and read a coverage-aware report
+- `skills/gsc-triage/SKILL.md` — blocking set, TP vs noise, PoC verification
+- `skills/gsc-fix-verify/SKILL.md` — fix a finding and prove it via `verify_fix`
+
+Point your agent at this repo (`npx skills add poliakarmai/gsc`) or copy the
+three directories into its skills folder.
 
 ## Canonical links
 
